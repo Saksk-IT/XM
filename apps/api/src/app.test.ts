@@ -781,6 +781,78 @@ describe("XM API", () => {
     });
   });
 
+  it("falls back to chat completions when an OpenAI-compatible provider does not proxy Responses", async () => {
+    env.openaiApiKey = "openai-token";
+    env.openaiBaseUrl = "https://api.openai-compatible.test/v1";
+    env.openaiBaseUrlConfigured = true;
+    env.openaiModel = "gpt-test";
+    const draft = {
+      title: "完善集成能力",
+      description: "补齐 GitHub 提交读取、草稿生成和设置页配置。",
+      type: "FEATURE",
+      status: "PENDING",
+      priority: "HIGH",
+      notes: "用户希望按业内最佳实践完善项目能力。",
+      tagNames: ["GitHub", "OpenAI", "设置页"],
+      checklist: ["读取 GitHub 提交", "生成事项草稿", "重建设置页面"]
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("<!doctype html><html>Bad gateway</html>", { status: 502 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify(draft)
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/work-items/draft`,
+      headers: {
+        cookie
+      },
+      payload: {
+        input: "列一个详细的目标计划，参考业内最佳，完善 GitHub、OpenAI 和设置页。"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(draft);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.openai-compatible.test/v1/responses",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.openai-compatible.test/v1/chat/completions",
+      expect.any(Object)
+    );
+  });
+
   it("rejects draft generation when OpenAI is missing or returns invalid JSON", async () => {
     const projectResponse = await app.inject({
       method: "POST",

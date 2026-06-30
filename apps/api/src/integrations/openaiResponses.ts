@@ -18,6 +18,14 @@ type ResponsesBody = {
   output?: ResponsesOutput[];
 };
 
+type ChatCompletionBody = {
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>;
+    };
+  }>;
+};
+
 export class OpenAIIntegrationError extends Error {
   constructor(
     message: string,
@@ -27,6 +35,63 @@ export class OpenAIIntegrationError extends Error {
   }
 }
 
+const draftInstructions = [
+  "你是一个项目管理整理器，只输出符合 schema 的 JSON。",
+  "把用户输入整理成可编辑的事项草稿，语言使用简体中文。",
+  "标题简短直接；描述面向项目成员；标签用模块、页面或技术名；清单写可验收步骤。",
+  "如果是缺陷、报错、异常、修复类内容，type 使用 BUG；否则使用 FEATURE。",
+  "除非用户明确说已完成，status 使用 PENDING。"
+].join("\n");
+const minimumDraftTimeoutMs = 60000;
+
+const draftJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "description", "type", "status", "priority", "notes", "tagNames", "checklist"],
+  properties: {
+    title: {
+      type: "string",
+      maxLength: 160
+    },
+    description: {
+      type: "string",
+      maxLength: 2000
+    },
+    type: {
+      type: "string",
+      enum: ["BUG", "FEATURE"]
+    },
+    status: {
+      type: "string",
+      enum: ["PENDING", "IN_PROGRESS", "DONE"]
+    },
+    priority: {
+      type: "string",
+      enum: ["LOW", "MEDIUM", "HIGH"]
+    },
+    notes: {
+      type: "string",
+      maxLength: 4000
+    },
+    tagNames: {
+      type: "array",
+      maxItems: 8,
+      items: {
+        type: "string",
+        maxLength: 32
+      }
+    },
+    checklist: {
+      type: "array",
+      maxItems: 12,
+      items: {
+        type: "string",
+        maxLength: 160
+      }
+    }
+  }
+};
+
 export async function generateWorkItemDraft(db: PrismaClient, input: string): Promise<GeneratedWorkItemDraft> {
   const config = await getIntegrationConfig(db);
   if (!config.openaiApiKey || !config.openaiModel) {
@@ -34,106 +99,37 @@ export async function generateWorkItemDraft(db: PrismaClient, input: string): Pr
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), env.openaiTimeoutMs);
+  const timeout = setTimeout(() => controller.abort(), Math.max(env.openaiTimeoutMs, minimumDraftTimeoutMs));
   try {
-    const response = await fetch(`${config.openaiBaseUrl.replace(/\/$/, "")}/responses`, {
+    const baseUrl = config.openaiBaseUrl.replace(/\/$/, "");
+    const headers = {
+      Authorization: `Bearer ${config.openaiApiKey}`,
+      "Content-Type": "application/json"
+    };
+    const response = await fetch(`${baseUrl}/responses`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${config.openaiApiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: config.openaiModel,
-        instructions: [
-          "你是一个项目管理整理器，只输出符合 schema 的 JSON。",
-          "把用户输入整理成可编辑的事项草稿，语言使用简体中文。",
-          "标题简短直接；描述面向项目成员；标签用模块、页面或技术名；清单写可验收步骤。",
-          "如果是缺陷、报错、异常、修复类内容，type 使用 BUG；否则使用 FEATURE。",
-          "除非用户明确说已完成，status 使用 PENDING。"
-        ].join("\n"),
-        input,
-        max_output_tokens: 1200,
-        text: {
-          format: {
-            type: "json_schema",
-            name: "xm_work_item_draft",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              required: ["title", "description", "type", "status", "priority", "notes", "tagNames", "checklist"],
-              properties: {
-                title: {
-                  type: "string",
-                  maxLength: 160
-                },
-                description: {
-                  type: "string",
-                  maxLength: 2000
-                },
-                type: {
-                  type: "string",
-                  enum: ["BUG", "FEATURE"]
-                },
-                status: {
-                  type: "string",
-                  enum: ["PENDING", "IN_PROGRESS", "DONE"]
-                },
-                priority: {
-                  type: "string",
-                  enum: ["LOW", "MEDIUM", "HIGH"]
-                },
-                notes: {
-                  type: "string",
-                  maxLength: 4000
-                },
-                tagNames: {
-                  type: "array",
-                  maxItems: 8,
-                  items: {
-                    type: "string",
-                    maxLength: 32
-                  }
-                },
-                checklist: {
-                  type: "array",
-                  maxItems: 12,
-                  items: {
-                    type: "string",
-                    maxLength: 160
-                  }
-                }
-              }
-            }
-          }
-        }
-      }),
+      headers,
+      body: JSON.stringify(createResponsesPayload(config.openaiModel, input)),
       signal: controller.signal
     });
 
     if (!response.ok) {
-      throw await createOpenAIError(response);
+      if (shouldFallbackToChatCompletions(response)) {
+        const text = await generateDraftWithChatCompletions({
+          baseUrl,
+          headers,
+          model: config.openaiModel,
+          input,
+          signal: controller.signal
+        });
+        return parseDraft(text);
+      }
+      throw await createOpenAIError(response, "OpenAI Responses 调用失败");
     }
 
-    const body = (await response.json()) as ResponsesBody;
+    const body = (await readJsonResponse(response, "OpenAI Responses 返回非 JSON")) as ResponsesBody;
     const text = extractOutputText(body);
-    if (!text) {
-      throw new OpenAIIntegrationError("OpenAI 未返回可解析的草稿内容", 502);
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new OpenAIIntegrationError("OpenAI 返回的草稿不是合法 JSON", 502);
-    }
-
-    const result = generatedWorkItemDraftSchema.safeParse(parsed);
-    if (!result.success) {
-      throw new OpenAIIntegrationError("OpenAI 返回的草稿字段不完整，请重试", 502);
-    }
-
-    return result.data;
+    return parseDraft(text);
   } catch (caught) {
     if (caught instanceof OpenAIIntegrationError) {
       throw caught;
@@ -147,7 +143,102 @@ export async function generateWorkItemDraft(db: PrismaClient, input: string): Pr
   }
 }
 
-async function createOpenAIError(response: Response): Promise<OpenAIIntegrationError> {
+function createResponsesPayload(model: string, input: string): object {
+  return {
+    model,
+    instructions: draftInstructions,
+    input,
+    max_output_tokens: 1200,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "xm_work_item_draft",
+        strict: true,
+        schema: draftJsonSchema
+      }
+    }
+  };
+}
+
+function createChatCompletionsPayload(model: string, input: string): object {
+  return {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: [
+          draftInstructions,
+          "输出必须是单个 JSON object，不要使用 Markdown。",
+          `JSON 字段要求：${JSON.stringify(draftJsonSchema)}`
+        ].join("\n")
+      },
+      {
+        role: "user",
+        content: input
+      }
+    ],
+    response_format: {
+      type: "json_object"
+    },
+    max_tokens: 1200
+  };
+}
+
+async function generateDraftWithChatCompletions(input: {
+  baseUrl: string;
+  headers: Record<string, string>;
+  model: string;
+  input: string;
+  signal: AbortSignal;
+}): Promise<string> {
+  const response = await fetch(`${input.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: input.headers,
+    body: JSON.stringify(createChatCompletionsPayload(input.model, input.input)),
+    signal: input.signal
+  });
+
+  if (!response.ok) {
+    throw await createOpenAIError(response, "OpenAI Chat Completions 调用失败");
+  }
+
+  const body = (await readJsonResponse(response, "OpenAI Chat Completions 返回非 JSON")) as ChatCompletionBody;
+  return extractChatCompletionText(body);
+}
+
+function parseDraft(text: string): GeneratedWorkItemDraft {
+  if (!text) {
+    throw new OpenAIIntegrationError("OpenAI 未返回可解析的草稿内容", 502);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new OpenAIIntegrationError("OpenAI 返回的草稿不是合法 JSON", 502);
+  }
+
+  const result = generatedWorkItemDraftSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new OpenAIIntegrationError("OpenAI 返回的草稿字段不完整，请重试", 502);
+  }
+
+  return result.data;
+}
+
+async function readJsonResponse(response: Response, message: string): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new OpenAIIntegrationError(message, 502);
+  }
+}
+
+function shouldFallbackToChatCompletions(response: Response): boolean {
+  return [404, 405, 501, 502, 503].includes(response.status);
+}
+
+async function createOpenAIError(response: Response, fallbackMessage: string): Promise<OpenAIIntegrationError> {
   const message = await readOpenAIError(response);
   if (response.status === 401) {
     return new OpenAIIntegrationError("OpenAI API Key 无效，请检查服务端配置", 503);
@@ -155,7 +246,7 @@ async function createOpenAIError(response: Response): Promise<OpenAIIntegrationE
   if (response.status === 429) {
     return new OpenAIIntegrationError("OpenAI 调用达到限额，请稍后重试", 429);
   }
-  return new OpenAIIntegrationError(message || "OpenAI Responses 调用失败", 502);
+  return new OpenAIIntegrationError(message || fallbackMessage, 502);
 }
 
 async function readOpenAIError(response: Response): Promise<string> {
@@ -176,6 +267,23 @@ function extractOutputText(body: ResponsesBody): string {
     for (const content of output.content ?? []) {
       if ((content.type === "output_text" || content.type === "text") && typeof content.text === "string") {
         return content.text;
+      }
+    }
+  }
+
+  return "";
+}
+
+function extractChatCompletionText(body: ChatCompletionBody): string {
+  for (const choice of body.choices ?? []) {
+    const content = choice.message?.content;
+    if (typeof content === "string") {
+      return content;
+    }
+    if (Array.isArray(content)) {
+      const text = content.find((item) => item.type === "text" && typeof item.text === "string")?.text;
+      if (text) {
+        return text;
       }
     }
   }
