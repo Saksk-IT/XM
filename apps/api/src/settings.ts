@@ -34,6 +34,7 @@ export class SettingsIntegrationError extends Error {
 }
 
 const encryptedPrefix = "enc:v1:";
+const defaultOpenAIBaseUrl = "https://api.openai.com/v1";
 
 export async function getIntegrationConfig(db: PrismaClient): Promise<IntegrationConfig> {
   const [
@@ -59,7 +60,7 @@ export async function getIntegrationConfig(db: PrismaClient): Promise<Integratio
   return {
     githubToken,
     openaiApiKey,
-    openaiBaseUrl: openaiBaseUrl || "https://api.openai.com/v1",
+    openaiBaseUrl: normalizeOpenAIBaseUrl(openaiBaseUrl),
     openaiModel,
     wechatMiniProgramAppId,
     wechatMiniProgramAppSecret,
@@ -176,8 +177,46 @@ export async function listOpenAIModels(db: PrismaClient): Promise<string[]> {
     throw new SettingsIntegrationError("读取 OpenAI 模型列表失败", 502);
   }
 
-  const body = (await response.json()) as { data?: Array<{ id?: string }> };
-  return [...new Set((body.data ?? []).map((model) => model.id).filter((id): id is string => Boolean(id)))].sort();
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new SettingsIntegrationError("OpenAI 模型列表返回非 JSON，请检查 base URL 是否指向兼容 OpenAI 的 /v1 地址", 502);
+  }
+
+  return parseModelIds(body);
+}
+
+function normalizeOpenAIBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return defaultOpenAIBaseUrl;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.hash = "";
+    url.search = "";
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    url.pathname = normalizedPath ? normalizedPath : "/v1";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return trimmed.replace(/\/+$/, "") || defaultOpenAIBaseUrl;
+  }
+}
+
+function parseModelIds(body: unknown): string[] {
+  if (!body || typeof body !== "object" || !Array.isArray((body as { data?: unknown }).data)) {
+    throw new SettingsIntegrationError("OpenAI 模型列表格式不正确，请检查 base URL 是否指向兼容 OpenAI 的 /v1 地址", 502);
+  }
+
+  return [
+    ...new Set(
+      (body as { data: Array<{ id?: unknown }> }).data
+        .map((model) => model.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    )
+  ].sort();
 }
 
 async function readPlainSetting(db: PrismaClient, key: SettingKey, fallback: string): Promise<string> {

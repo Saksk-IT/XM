@@ -446,6 +446,87 @@ describe("XM API", () => {
     );
   });
 
+  it("normalizes OpenAI-compatible root URLs before listing models", async () => {
+    const modelsFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: [{ id: "gpt-5.5" }]
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", modelsFetch);
+
+    const saved = await app.inject({
+      method: "PATCH",
+      url: "/api/settings/runtime",
+      headers: {
+        cookie
+      },
+      payload: {
+        openai: {
+          apiKey: "openai-key-from-settings",
+          baseUrl: "https://openai-compatible.test/",
+          model: "gpt-5.5"
+        }
+      }
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().openai.baseUrl).toBe("https://openai-compatible.test/v1");
+
+    const models = await app.inject({
+      method: "GET",
+      url: "/api/settings/openai/models",
+      headers: {
+        cookie
+      }
+    });
+    expect(models.statusCode).toBe(200);
+    expect(models.json()).toEqual({
+      models: ["gpt-5.5"]
+    });
+    expect(modelsFetch).toHaveBeenCalledWith(
+      "https://openai-compatible.test/v1/models",
+      expect.objectContaining({
+        headers: {
+          Authorization: "Bearer openai-key-from-settings"
+        }
+      })
+    );
+  });
+
+  it("returns a user-readable error when the OpenAI model endpoint returns non-json", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<!doctype html><html></html>", { status: 200 })));
+
+    const saved = await app.inject({
+      method: "PATCH",
+      url: "/api/settings/runtime",
+      headers: {
+        cookie
+      },
+      payload: {
+        openai: {
+          apiKey: "openai-key-from-settings",
+          baseUrl: "https://openai-compatible.test/",
+          model: "gpt-5.5"
+        }
+      }
+    });
+    expect(saved.statusCode).toBe(200);
+
+    const models = await app.inject({
+      method: "GET",
+      url: "/api/settings/openai/models",
+      headers: {
+        cookie
+      }
+    });
+    expect(models.statusCode).toBe(502);
+    expect(models.json()).toEqual({
+      message: "OpenAI 模型列表返回非 JSON，请检查 base URL 是否指向兼容 OpenAI 的 /v1 地址"
+    });
+  });
+
   it("creates work items, searches them, changes state, and updates checklist", async () => {
     const projectResponse = await app.inject({
       method: "POST",
