@@ -1,0 +1,16 @@
+{
+  "name": "@xm/miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint miniprogram --ext .ts",
+    "test": "node scripts/check-miniprogram.mjs",
+    "build": "pnpm typecheck"
+  },
+  "dependencies": {
+    "@xm/shared": "workspace:*"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,56 @@
+<view class="page-shell">
+  <view class="hero compact-hero">
+    <view class="hero-kicker">WORK ITEM</view>
+    <view class="hero-title">{{title || "任务详情"}}</view>
+    <view class="hero-copy">编辑事项核心信息、推进状态和验收清单。</view>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+
+  <view class="surface">
+    <view class="field">
+      <text class="label">标题</text>
+      <input class="input" value="{{title}}" bindinput="onTitleInput" />
+    </view>
+    <view class="field">
+      <text class="label">描述</text>
+      <textarea class="textarea" value="{{description}}" bindinput="onDescriptionInput" />
+    </view>
+    <view class="picker-grid">
+      <picker range="{{typeLabels}}" value="{{typeIndex}}" bindchange="onTypeChange">
+        <view class="select-value">{{typeLabels[typeIndex]}}</view>
+      </picker>
+      <picker range="{{statusLabels}}" value="{{statusIndex}}" bindchange="onStatusChange">
+        <view class="select-value">{{statusLabels[statusIndex]}}</view>
+      </picker>
+      <picker range="{{priorityLabels}}" value="{{priorityIndex}}" bindchange="onPriorityChange">
+        <view class="select-value">{{priorityLabels[priorityIndex]}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="label">标签</text>
+      <input class="input" value="{{tagNamesText}}" bindinput="onTagsInput" placeholder="多个标签用逗号分隔" />
+    </view>
+    <view class="field">
+      <text class="label">备注</text>
+      <textarea class="textarea" value="{{notes}}" bindinput="onNotesInput" />
+    </view>
+    <button class="btn" loading="{{saving}}" disabled="{{saving}}" bindtap="saveItem">保存任务</button>
+  </view>
+
+  <view class="surface checklist-card">
+    <view class="row space-between">
+      <view class="block-title">验收清单</view>
+      <view class="check-summary">{{checklistSummary}}</view>
+    </view>
+    <view wx:if="{{checklist.length === 0}}" class="empty compact-empty">暂无清单</view>
+    <view wx:for="{{checklist}}" wx:for-item="check" wx:key="id" class="check-row" data-id="{{check.id}}" bindtap="toggleChecklist">
+      <view class="check-box {{check.done ? 'checked' : ''}}">{{check.done ? "✓" : ""}}</view>
+      <view class="check-title {{check.done ? 'done' : ''}}">{{check.title}}</view>
+    </view>
+    <view class="add-check">
+      <input class="input check-input" value="{{newChecklistTitle}}" bindinput="onChecklistTitleInput" placeholder="新增清单项" />
+      <button class="btn btn-secondary add-btn" bindtap="addChecklist">添加</button>
+    </view>
+  </view>
+</view>

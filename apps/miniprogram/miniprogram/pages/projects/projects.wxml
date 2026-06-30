@@ -1,0 +1,48 @@
+<view class="page-shell">
+  <view class="hero">
+    <view class="row space-between">
+      <view>
+        <view class="hero-kicker">XM PROJECTS</view>
+        <view class="hero-title">项目工作台</view>
+      </view>
+      <button class="icon-btn" loading="{{loading}}" bindtap="loadProjects">刷新</button>
+    </view>
+    <view class="hero-copy">聚焦待办、完成率和近期需要推进的项目。</view>
+    <view class="hero-grid">
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{overview.totalProjects}}</view>
+        <view class="hero-metric-label">项目</view>
+      </view>
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{overview.openItems}}</view>
+        <view class="hero-metric-label">待推进</view>
+      </view>
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{overview.averageCompletion}}%</view>
+        <view class="hero-metric-label">平均完成</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <view wx:if="{{!loading && projects.length === 0}}" class="surface empty">暂无项目</view>
+
+  <view class="stack">
+    <view wx:for="{{projects}}" wx:key="id" class="surface project-card" data-id="{{item.id}}" bindtap="openProject">
+      <view class="row space-between">
+        <view class="project-main">
+          <view class="project-name">{{item.name}}</view>
+          <view class="project-desc">{{item.description || "暂无描述"}}</view>
+        </view>
+        <view class="completion-pill">{{item.completionText}}</view>
+      </view>
+      <view class="progress-track">
+        <view class="progress-fill" style="{{item.progressStyle}}"></view>
+      </view>
+      <view class="project-meta">
+        <text>{{item.healthLabel}}</text>
+        <text>已完成 {{item.doneCount}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,78 @@
+.create-card {
+  margin-bottom: 24rpx;
+}
+
+.form-head {
+  margin-bottom: 18rpx;
+}
+
+.picker-grid {
+  display: grid;
+  gap: 12rpx;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 22rpx;
+}
+
+.list-panel {
+  padding-bottom: 12rpx;
+}
+
+.task-count {
+  color: #64748b;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.compact-empty {
+  padding: 28rpx 0;
+}
+
+.task-card {
+  border-top: 1rpx solid #e2e8f0;
+  padding: 24rpx 0;
+}
+
+.task-card:first-of-type {
+  border-top: 0;
+}
+
+.task-title {
+  color: #0f172a;
+  flex: 1;
+  font-size: 29rpx;
+  font-weight: 800;
+  line-height: 1.35;
+  margin-right: 14rpx;
+  min-width: 0;
+}
+
+.task-desc {
+  color: #64748b;
+  font-size: 24rpx;
+  line-height: 1.5;
+  margin-top: 10rpx;
+}
+
+.task-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.type-chip {
+  background: #f1f5f9;
+  border-radius: 10rpx;
+  color: #475569;
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 7rpx 12rpx;
+}
+
+.task-foot {
+  color: #94a3b8;
+  display: flex;
+  font-size: 22rpx;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}

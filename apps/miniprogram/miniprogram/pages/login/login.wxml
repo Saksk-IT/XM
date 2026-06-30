@@ -1,0 +1,38 @@
+<view class="page-shell login-shell">
+  <view class="login-hero">
+    <view class="brand-row">
+      <view class="brand-mark">XM</view>
+      <view>
+        <view class="hero-kicker">PROJECT OS</view>
+        <view class="hero-title">移动项目控制台</view>
+      </view>
+    </view>
+    <view class="hero-copy">用微信身份进入你的单管理员项目管理系统，随时处理 Bug、功能和交付清单。</view>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+
+  <view class="surface auth-panel">
+    <block wx:if="{{binding}}">
+      <view class="block-title">绑定管理员</view>
+      <view class="subtitle">首次使用需要验证 XM 管理员账号，绑定后将自动使用微信登录。</view>
+      <view class="field">
+        <text class="label">账号</text>
+        <input class="input" value="{{username}}" bindinput="onUsernameInput" />
+      </view>
+      <view class="field">
+        <text class="label">密码</text>
+        <input class="input" password value="{{password}}" bindinput="onPasswordInput" />
+      </view>
+      <button class="btn" loading="{{loading}}" disabled="{{loading}}" bindtap="submitBind">完成绑定</button>
+    </block>
+
+    <block wx:else>
+      <view class="block-title">微信安全登录</view>
+      <view class="subtitle">当前微信未绑定时，会进入管理员确认流程。</view>
+      <button class="btn" loading="{{loading}}" disabled="{{loading}}" bindtap="startLogin">
+        {{loading ? "登录中" : "微信登录"}}
+      </button>
+    </block>
+  </view>
+</view>

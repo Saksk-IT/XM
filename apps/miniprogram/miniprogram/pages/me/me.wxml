@@ -1,0 +1,27 @@
+<view class="page-shell">
+  <view class="hero me-hero">
+    <view class="hero-kicker">ACCOUNT</view>
+    <view class="hero-title">{{productName}}</view>
+    <view class="hero-copy">账号状态、运行环境和本地调试入口。</view>
+  </view>
+
+  <view class="surface profile-card">
+    <view class="avatar">XM</view>
+    <view class="profile-main">
+      <view class="profile-name">{{user ? user.displayName : "未登录"}}</view>
+      <view class="profile-sub">{{user ? user.username : "请先完成微信登录绑定"}}</view>
+    </view>
+  </view>
+
+  <view class="surface info-card">
+    <view class="row space-between">
+      <view class="info-label">API 地址</view>
+      <view class="status-dot {{loggedIn ? 'online' : ''}}"></view>
+    </view>
+    <view class="info-value">{{apiBaseUrl}}</view>
+    <view class="hint">{{localDebugHint}}</view>
+  </view>
+
+  <button wx:if="{{loggedIn}}" class="btn btn-danger" bindtap="logout">退出登录</button>
+  <button wx:else class="btn" bindtap="goLogin">去登录</button>
+</view>

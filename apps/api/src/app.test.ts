@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app.js";
 import { env } from "./env.js";
+import { clearGitHubCommitCache } from "./integrations/github.js";
 
 const db = new PrismaClient();
 const username = "admin";
@@ -15,6 +16,8 @@ async function resetDatabase() {
   await db.tag.deleteMany();
   await db.workItem.deleteMany();
   await db.project.deleteMany();
+  await db.appSetting.deleteMany();
+  await db.wechatAccount.deleteMany();
   await db.user.deleteMany();
   await db.user.create({
     data: {
@@ -29,9 +32,23 @@ describe("XM API", () => {
   let app: Awaited<ReturnType<typeof createApp>>;
   let cookie = "";
   let originalAgentApiToken = "";
+  let originalGitHubToken = "";
+  let originalOpenAIKey = "";
+  let originalOpenAIModel = "";
+  let originalOpenAIBaseUrl = "";
+  let originalOpenAIBaseUrlConfigured = false;
+  let originalWechatMiniProgramAppId = "";
+  let originalWechatMiniProgramAppSecret = "";
 
   beforeAll(async () => {
     originalAgentApiToken = env.agentApiToken;
+    originalGitHubToken = env.githubToken;
+    originalOpenAIKey = env.openaiApiKey;
+    originalOpenAIModel = env.openaiModel;
+    originalOpenAIBaseUrl = env.openaiBaseUrl;
+    originalOpenAIBaseUrlConfigured = env.openaiBaseUrlConfigured;
+    originalWechatMiniProgramAppId = env.wechatMiniProgramAppId;
+    originalWechatMiniProgramAppSecret = env.wechatMiniProgramAppSecret;
     app = await createApp({
       db,
       staticRoot: "/tmp/xm-static-missing"
@@ -39,6 +56,16 @@ describe("XM API", () => {
   });
 
   beforeEach(async () => {
+    vi.unstubAllGlobals();
+    clearGitHubCommitCache();
+    env.agentApiToken = originalAgentApiToken;
+    env.githubToken = "";
+    env.openaiApiKey = "";
+    env.openaiModel = "";
+    env.openaiBaseUrl = "https://api.openai.test/v1";
+    env.openaiBaseUrlConfigured = false;
+    env.wechatMiniProgramAppId = "";
+    env.wechatMiniProgramAppSecret = "";
     await resetDatabase();
     const login = await app.inject({
       method: "POST",
@@ -53,6 +80,14 @@ describe("XM API", () => {
 
   afterAll(async () => {
     env.agentApiToken = originalAgentApiToken;
+    env.githubToken = originalGitHubToken;
+    env.openaiApiKey = originalOpenAIKey;
+    env.openaiModel = originalOpenAIModel;
+    env.openaiBaseUrl = originalOpenAIBaseUrl;
+    env.openaiBaseUrlConfigured = originalOpenAIBaseUrlConfigured;
+    env.wechatMiniProgramAppId = originalWechatMiniProgramAppId;
+    env.wechatMiniProgramAppSecret = originalWechatMiniProgramAppSecret;
+    vi.unstubAllGlobals();
     await resetDatabase();
     await app.close();
     await db.$disconnect();
@@ -71,6 +106,115 @@ describe("XM API", () => {
     expect(response.json()).toMatchObject({
       username,
       displayName: "Leo"
+    });
+  });
+
+  it("supports miniprogram login binding and bearer-authenticated project access", async () => {
+    const missingConfig = await app.inject({
+      method: "POST",
+      url: "/api/miniprogram/auth/login",
+      payload: {
+        code: "wx-login-code"
+      }
+    });
+    expect(missingConfig.statusCode).toBe(503);
+
+    env.wechatMiniProgramAppId = "wx-test-app";
+    env.wechatMiniProgramAppSecret = "wechat-secret";
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          openid: "openid-admin",
+          unionid: "union-admin",
+          session_key: "session-key"
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "MiniApp",
+        description: "微信小程序管理端",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/miniprogram/auth/login",
+      payload: {
+        code: "wx-login-code"
+      }
+    });
+    expect(login.statusCode).toBe(202);
+    expect(login.json()).toMatchObject({
+      status: "BINDING_REQUIRED"
+    });
+    expect(login.body).not.toContain("session-key");
+    const bindToken = login.json().bindToken as string;
+
+    const wrongPassword = await app.inject({
+      method: "POST",
+      url: "/api/miniprogram/auth/bind",
+      payload: {
+        bindToken,
+        username,
+        password: "wrong-password"
+      }
+    });
+    expect(wrongPassword.statusCode).toBe(401);
+
+    const bound = await app.inject({
+      method: "POST",
+      url: "/api/miniprogram/auth/bind",
+      payload: {
+        bindToken,
+        username,
+        password
+      }
+    });
+    expect(bound.statusCode).toBe(200);
+    expect(bound.json()).toMatchObject({
+      status: "AUTHENTICATED",
+      user: {
+        username
+      }
+    });
+    expect(bound.body).not.toContain("wechat-secret");
+    expect(await db.wechatAccount.count()).toBe(1);
+
+    const token = bound.json().token as string;
+    const bearerProjects = await app.inject({
+      method: "GET",
+      url: "/api/projects",
+      headers: {
+        authorization: `Bearer ${token}`
+      }
+    });
+    expect(bearerProjects.statusCode).toBe(200);
+    expect(bearerProjects.json()).toEqual([expect.objectContaining({ id: project.id })]);
+
+    const secondLogin = await app.inject({
+      method: "POST",
+      url: "/api/miniprogram/auth/login",
+      payload: {
+        code: "wx-login-code"
+      }
+    });
+    expect(secondLogin.statusCode).toBe(200);
+    expect(secondLogin.json()).toMatchObject({
+      status: "AUTHENTICATED",
+      user: {
+        username
+      }
     });
   });
 
@@ -157,6 +301,151 @@ describe("XM API", () => {
     expect(restoredList.json()).toHaveLength(1);
   });
 
+  it("returns runtime integration status without exposing secrets", async () => {
+    env.githubToken = "ghp_test_secret";
+    env.openaiApiKey = "sk-test-secret";
+    env.openaiModel = "gpt-test";
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/settings/runtime",
+      headers: {
+        cookie
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      github: {
+        token: {
+          configured: true,
+          maskedValue: "ghp_••••cret"
+        },
+        configured: true,
+        publicAccess: true
+      },
+      openai: {
+        apiKey: {
+          configured: true,
+          maskedValue: "sk-t••••cret"
+        },
+        configured: true,
+        baseUrl: "https://api.openai.test/v1",
+        model: "gpt-test",
+        baseUrlConfigured: false
+      },
+      wechatMiniProgram: {
+        configured: false,
+        appId: "",
+        name: "",
+        originalId: "",
+        appSecret: {
+          configured: false,
+          maskedValue: null
+        }
+      }
+    });
+    expect(response.body).not.toContain("ghp_test_secret");
+    expect(response.body).not.toContain("sk-test-secret");
+  });
+
+  it("saves integration settings, masks secrets, and uses them for model listing", async () => {
+    const modelsFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          data: [{ id: "gpt-5.5" }, { id: "gpt-5.5-mini" }, { id: "gpt-5.5" }]
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", modelsFetch);
+
+    const saved = await app.inject({
+      method: "PATCH",
+      url: "/api/settings/runtime",
+      headers: {
+        cookie
+      },
+      payload: {
+        github: {
+          token: "github-token-from-settings"
+        },
+        openai: {
+          apiKey: "openai-key-from-settings",
+          baseUrl: "https://api.openai.settings/v1",
+          model: "gpt-5.5"
+        },
+        wechatMiniProgram: {
+          appId: "wx-settings-app",
+          appSecret: "wechat-secret-from-settings",
+          name: "XM 小程序",
+          originalId: "gh_xm"
+        }
+      }
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      github: {
+        token: {
+          configured: true,
+          maskedValue: "gith••••ings"
+        }
+      },
+      openai: {
+        apiKey: {
+          configured: true,
+          maskedValue: "open••••ings"
+        },
+        baseUrl: "https://api.openai.settings/v1",
+        model: "gpt-5.5"
+      },
+      wechatMiniProgram: {
+        configured: true,
+        appId: "wx-settings-app",
+        name: "XM 小程序",
+        originalId: "gh_xm",
+        appSecret: {
+          configured: true,
+          maskedValue: "wech••••ings"
+        }
+      }
+    });
+    expect(saved.body).not.toContain("github-token-from-settings");
+    expect(saved.body).not.toContain("openai-key-from-settings");
+    expect(saved.body).not.toContain("wechat-secret-from-settings");
+
+    const rawSecrets = await db.appSetting.findMany({
+      where: {
+        key: {
+          in: ["github.token", "openai.apiKey", "wechatMiniProgram.appSecret"]
+        }
+      }
+    });
+    expect(rawSecrets).toHaveLength(3);
+    expect(rawSecrets.every((setting) => setting.value.startsWith("enc:v1:"))).toBe(true);
+
+    const models = await app.inject({
+      method: "GET",
+      url: "/api/settings/openai/models",
+      headers: {
+        cookie
+      }
+    });
+    expect(models.statusCode).toBe(200);
+    expect(models.json()).toEqual({
+      models: ["gpt-5.5", "gpt-5.5-mini"]
+    });
+    expect(modelsFetch).toHaveBeenCalledWith(
+      "https://api.openai.settings/v1/models",
+      expect.objectContaining({
+        headers: {
+          Authorization: "Bearer openai-key-from-settings"
+        }
+      })
+    );
+  });
+
   it("creates work items, searches them, changes state, and updates checklist", async () => {
     const projectResponse = await app.inject({
       method: "POST",
@@ -228,6 +517,229 @@ describe("XM API", () => {
     });
     expect(checked.statusCode).toBe(200);
     expect(checked.json().checklist[0].done).toBe(true);
+  });
+
+  it("lists GitHub commits with server-side auth headers and short cache", async () => {
+    env.githubToken = "github-token";
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify([
+          {
+            sha: "abcdef1234567890",
+            html_url: "https://github.com/example/devflow/commit/abcdef1",
+            commit: {
+              message: "Fix upload retry\n\nKeep progress state after reconnect.",
+              author: {
+                name: "Mona",
+                email: "mona@example.com",
+                date: "2026-07-01T08:00:00.000Z"
+              },
+              verification: {
+                verified: true,
+                reason: "valid"
+              }
+            },
+            author: {
+              login: "monalisa"
+            }
+          }
+        ]),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        repoUrl: "https://github.com/example/devflow.git",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const first = await app.inject({
+      method: "GET",
+      url: `/api/projects/${project.id}/github/commits?limit=1&branch=main`,
+      headers: {
+        cookie
+      }
+    });
+    const second = await app.inject({
+      method: "GET",
+      url: `/api/projects/${project.id}/github/commits?limit=1&branch=main`,
+      headers: {
+        cookie
+      }
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(first.json()).toEqual([
+      expect.objectContaining({
+        shortSha: "abcdef1",
+        title: "Fix upload retry",
+        authorName: "monalisa",
+        verification: {
+          verified: true,
+          reason: "valid"
+        }
+      })
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://api.github.com/repos/example/devflow/commits?per_page=1&sha=main");
+    const headers = init.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer github-token");
+    expect(headers.get("Accept")).toBe("application/vnd.github+json");
+  });
+
+  it("maps GitHub repository and rate-limit errors to user-readable API responses", async () => {
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        repoUrl: "https://github.com/example/devflow",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ message: "Not Found" }), { status: 404 }))
+    );
+    const missing = await app.inject({
+      method: "GET",
+      url: `/api/projects/${project.id}/github/commits`,
+      headers: {
+        cookie
+      }
+    });
+    expect(missing.statusCode).toBe(404);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+            status: 403,
+            headers: {
+              "x-ratelimit-remaining": "0"
+            }
+          })
+      )
+    );
+    const limited = await app.inject({
+      method: "GET",
+      url: `/api/projects/${project.id}/github/commits`,
+      headers: {
+        cookie
+      }
+    });
+    expect(limited.statusCode).toBe(429);
+  });
+
+  it("generates editable work item drafts through OpenAI Responses", async () => {
+    env.openaiApiKey = "openai-token";
+    env.openaiModel = "gpt-test";
+    const draft = {
+      title: "修复上传断网重试",
+      description: "断网恢复后上传进度需要继续同步。",
+      type: "BUG",
+      status: "PENDING",
+      priority: "HIGH",
+      notes: "用户反馈上传状态卡住。",
+      tagNames: ["上传", "网络"],
+      checklist: ["复现断网重连", "补充进度恢复测试"]
+    };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/work-items/draft`,
+      headers: {
+        cookie
+      },
+      payload: {
+        input: "上传过程中断网，恢复网络后进度一直卡在 60%，需要修复并补测试。"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(draft);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.openai.test/v1/responses");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer openai-token");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      model: "gpt-test",
+      max_output_tokens: 1200
+    });
+  });
+
+  it("rejects draft generation when OpenAI is missing or returns invalid JSON", async () => {
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const missingConfig = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/work-items/draft`,
+      headers: {
+        cookie
+      },
+      payload: {
+        input: "新增设置页面，需要从弹窗迁移到独立路由。"
+      }
+    });
+    expect(missingConfig.statusCode).toBe(503);
+
+    env.openaiApiKey = "openai-token";
+    env.openaiModel = "gpt-test";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ output_text: "not-json" }), { status: 200 })));
+    const invalidJson = await app.inject({
+      method: "POST",
+      url: `/api/projects/${project.id}/work-items/draft`,
+      headers: {
+        cookie
+      },
+      payload: {
+        input: "新增设置页面，需要从弹窗迁移到独立路由。"
+      }
+    });
+    expect(invalidJson.statusCode).toBe(502);
   });
 
   it("rejects agent requests without a configured valid token", async () => {

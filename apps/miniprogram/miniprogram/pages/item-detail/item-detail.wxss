@@ -1,0 +1,85 @@
+.compact-hero {
+  padding-bottom: 32rpx;
+}
+
+.picker-grid {
+  display: grid;
+  gap: 12rpx;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 22rpx;
+}
+
+.checklist-card {
+  margin-top: 22rpx;
+}
+
+.check-summary {
+  background: #f1f5f9;
+  border-radius: 10rpx;
+  color: #475569;
+  font-size: 23rpx;
+  font-weight: 800;
+  padding: 8rpx 14rpx;
+}
+
+.compact-empty {
+  padding: 28rpx 0;
+}
+
+.check-row {
+  align-items: center;
+  border-top: 1rpx solid #e2e8f0;
+  display: flex;
+  gap: 16rpx;
+  min-height: 82rpx;
+}
+
+.check-row:first-of-type {
+  border-top: 0;
+}
+
+.check-box {
+  align-items: center;
+  border: 2rpx solid #94a3b8;
+  border-radius: 9rpx;
+  color: #ffffff;
+  display: flex;
+  font-size: 22rpx;
+  font-weight: 900;
+  height: 36rpx;
+  justify-content: center;
+  width: 36rpx;
+}
+
+.check-box.checked {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+.check-title {
+  color: #172033;
+  flex: 1;
+  font-size: 27rpx;
+  line-height: 1.45;
+}
+
+.check-title.done {
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.add-check {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.check-input {
+  flex: 1;
+}
+
+.add-btn {
+  flex-shrink: 0;
+  min-height: 82rpx;
+  width: 148rpx;
+}

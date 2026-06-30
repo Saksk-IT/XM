@@ -26,7 +26,7 @@ test("manages projects and work items", async ({ page }) => {
   await page.getByRole("button", { name: "新建", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("标题").fill("登录页错误提示优化");
-  await dialog.getByLabel("描述").fill("密码错误时展示清晰提示");
+  await dialog.getByLabel("描述", { exact: true }).fill("密码错误时展示清晰提示");
   await dialog.getByLabel("类型").selectOption("BUG");
   await dialog.getByLabel("优先级").selectOption("HIGH");
   await dialog.getByRole("button", { name: "保存" }).click();
@@ -35,7 +35,7 @@ test("manages projects and work items", async ({ page }) => {
   await page.getByRole("button", { name: "新建", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("标题").fill("项目进度统计");
-  await dialog.getByLabel("描述").fill("按四类事项统计进度");
+  await dialog.getByLabel("描述", { exact: true }).fill("按四类事项统计进度");
   await dialog.getByLabel("类型").selectOption("FEATURE");
   await dialog.getByRole("button", { name: "保存" }).click();
   await expect(page.getByRole("heading", { name: "项目进度统计" }).first()).toBeVisible();
@@ -54,12 +54,13 @@ test("manages projects and work items", async ({ page }) => {
   await expect(page.getByRole("heading", { name: projectName })).toHaveCount(0);
 
   await page.getByRole("button", { name: "设置" }).click();
-  dialog = page.getByRole("dialog", { name: "设置" });
-  await expect(dialog.getByText(projectName)).toBeVisible();
-  await dialog.getByRole("button", { name: `恢复项目 ${projectName}` }).click();
-  await expect(dialog.getByText("暂无归档项目")).toBeVisible();
-  await dialog.getByRole("button", { name: "关闭" }).click();
+  await expect(page).toHaveURL(/\/settings/);
+  await page.getByRole("button", { name: "归档" }).first().click();
+  await expect(page.getByText(projectName)).toBeVisible();
+  await page.getByRole("button", { name: `恢复项目 ${projectName}` }).click();
+  await expect(page.getByText("暂无归档项目")).toBeVisible();
 
+  await page.getByRole("button", { name: "返回项目" }).click();
   await page.getByTitle(projectName).click();
   await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
 });

@@ -2,12 +2,18 @@ import type {
   CreateChecklistInput,
   CreateProjectInput,
   CreateWorkItemInput,
+  GenerateWorkItemDraftInput,
+  GeneratedWorkItemDraft,
+  GitHubCommit,
+  GitHubCommitListQuery,
   LoginInput,
   Me,
   ProjectDetail,
   ProjectSummary,
+  RuntimeSettings,
   UpdateChecklistInput,
   UpdateProjectInput,
+  UpdateRuntimeSettingsInput,
   UpdateWorkItemInput,
   WorkItem,
   WorkItemQuery
@@ -63,6 +69,16 @@ function queryString(query: WorkItemQuery): string {
   return params.toString();
 }
 
+function optionalQueryString(query: Partial<Record<string, string | number | undefined>>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  }
+  return params.toString();
+}
+
 export const api = {
   login(input: LoginInput) {
     return apiFetch<Me>("/api/auth/login", json("POST", input));
@@ -72,6 +88,15 @@ export const api = {
   },
   me() {
     return apiFetch<Me>("/api/auth/me");
+  },
+  runtimeSettings() {
+    return apiFetch<RuntimeSettings>("/api/settings/runtime");
+  },
+  updateRuntimeSettings(input: UpdateRuntimeSettingsInput) {
+    return apiFetch<RuntimeSettings>("/api/settings/runtime", json("PATCH", input));
+  },
+  listOpenAIModels() {
+    return apiFetch<{ models: string[] }>("/api/settings/openai/models");
   },
   listProjects(options: { includeArchived?: boolean } = {}) {
     const params = new URLSearchParams();
@@ -92,6 +117,13 @@ export const api = {
   },
   getProject(id: string) {
     return apiFetch<ProjectDetail>(`/api/projects/${id}`);
+  },
+  listGitHubCommits(projectId: string, query: GitHubCommitListQuery = { limit: 20 }) {
+    const qs = optionalQueryString(query);
+    return apiFetch<GitHubCommit[]>(`/api/projects/${projectId}/github/commits${qs ? `?${qs}` : ""}`);
+  },
+  generateWorkItemDraft(projectId: string, input: GenerateWorkItemDraftInput) {
+    return apiFetch<GeneratedWorkItemDraft>(`/api/projects/${projectId}/work-items/draft`, json("POST", input));
   },
   listItems(projectId: string, query: WorkItemQuery = {}) {
     const qs = queryString(query);

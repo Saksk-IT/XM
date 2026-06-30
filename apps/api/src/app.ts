@@ -12,9 +12,14 @@ import {
   createChecklistSchema,
   createProjectSchema,
   createWorkItemSchema,
+  generateWorkItemDraftSchema,
+  githubCommitListQuerySchema,
   loginSchema,
+  miniprogramBindSchema,
+  miniprogramLoginSchema,
   updateChecklistSchema,
   updateProjectSchema,
+  updateRuntimeSettingsSchema,
   updateWorkItemSchema,
   workItemQuerySchema
 } from "@xm/shared";
@@ -26,7 +31,20 @@ import {
   serializeWorkItem,
   workItemInclude
 } from "./serializers.js";
-import { clearSessionCookie, getCurrentUser, requireAgentToken, requireUser, setSessionCookie } from "./security.js";
+import { GitHubIntegrationError, listGitHubCommits } from "./integrations/github.js";
+import { generateWorkItemDraft, OpenAIIntegrationError } from "./integrations/openaiResponses.js";
+import { exchangeCodeForWechatIdentity, WechatMiniprogramError } from "./integrations/wechatMiniprogram.js";
+import { getRuntimeSettings, listOpenAIModels, SettingsIntegrationError, updateRuntimeSettings } from "./settings.js";
+import {
+  clearSessionCookie,
+  createMiniprogramAccessToken,
+  createMiniprogramBindToken,
+  getCurrentUser,
+  requireAgentToken,
+  requireUser,
+  setSessionCookie,
+  verifyMiniprogramBindToken
+} from "./security.js";
 import { syncTags } from "./tags.js";
 
 type CreateAppOptions = {
@@ -165,6 +183,20 @@ function normalizeRepoUrl(value: string | null | undefined): string | null {
   }
 }
 
+function miniprogramAuthSuccess(user: { id: string; username: string; displayName: string }) {
+  const session = createMiniprogramAccessToken(user.id);
+  return {
+    status: "AUTHENTICATED" as const,
+    token: session.token,
+    expiresAt: session.expiresAt.toISOString(),
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName
+    }
+  };
+}
+
 export async function createApp({ db, staticRoot = staticRootDefault() }: CreateAppOptions) {
   const app = Fastify({
     logger: false
@@ -230,6 +262,106 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
       username: user.username,
       displayName: user.displayName
     };
+  });
+
+  app.post("/api/miniprogram/auth/login", async (request, reply) => {
+    const body = miniprogramLoginSchema.parse(request.body);
+
+    try {
+      const identity = await exchangeCodeForWechatIdentity(db, body.code);
+      const account = await db.wechatAccount.findUnique({
+        where: {
+          openId: identity.openId
+        },
+        include: {
+          user: true
+        }
+      });
+
+      if (account) {
+        return miniprogramAuthSuccess(account.user);
+      }
+
+      const bind = createMiniprogramBindToken(identity);
+      return reply.code(202).send({
+        status: "BINDING_REQUIRED",
+        bindToken: bind.bindToken,
+        expiresAt: bind.expiresAt.toISOString()
+      });
+    } catch (caught) {
+      if (caught instanceof WechatMiniprogramError) {
+        return reply.code(caught.statusCode).send({ message: caught.message });
+      }
+      throw caught;
+    }
+  });
+
+  app.post("/api/miniprogram/auth/bind", async (request, reply) => {
+    const body = miniprogramBindSchema.parse(request.body);
+    const identity = verifyMiniprogramBindToken(body.bindToken);
+    if (!identity) {
+      return reply.code(401).send({ message: "微信绑定凭证已失效，请重新登录" });
+    }
+
+    const user = await db.user.findUnique({
+      where: {
+        username: body.username
+      }
+    });
+    if (!user || !(await argon2.verify(user.passwordHash, body.password))) {
+      return reply.code(401).send({ message: "管理员账号或密码错误" });
+    }
+
+    await db.wechatAccount.upsert({
+      where: {
+        openId: identity.openId
+      },
+      create: {
+        userId: user.id,
+        openId: identity.openId,
+        unionId: identity.unionId
+      },
+      update: {
+        userId: user.id,
+        unionId: identity.unionId
+      }
+    });
+
+    return miniprogramAuthSuccess(user);
+  });
+
+  app.get("/api/settings/runtime", async (request, reply) => {
+    if (!(await requireUser(request, reply, db))) {
+      return;
+    }
+
+    return getRuntimeSettings(db);
+  });
+
+  app.patch("/api/settings/runtime", async (request, reply) => {
+    if (!(await requireUser(request, reply, db))) {
+      return;
+    }
+
+    const body = updateRuntimeSettingsSchema.parse(request.body);
+    return updateRuntimeSettings(db, body);
+  });
+
+  app.get("/api/settings/openai/models", async (request, reply) => {
+    if (!(await requireUser(request, reply, db))) {
+      return;
+    }
+
+    try {
+      return {
+        models: await listOpenAIModels(db)
+      };
+    } catch (caught) {
+      if (caught instanceof SettingsIntegrationError) {
+        return reply.code(caught.statusCode).send({ message: caught.message });
+      }
+      throw caught;
+    }
   });
 
   app.get("/api/projects", async (request, reply) => {
@@ -325,6 +457,61 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
     });
 
     return serializeProjectDetail(project);
+  });
+
+  app.get("/api/projects/:id/github/commits", async (request, reply) => {
+    if (!(await requireUser(request, reply, db))) {
+      return;
+    }
+
+    const { id } = routeIdSchema.parse(request.params);
+    const query = githubCommitListQuerySchema.parse(request.query);
+    const project = await db.project.findUnique({
+      where: { id },
+      select: {
+        repoUrl: true
+      }
+    });
+
+    if (!project) {
+      return reply.code(404).send({ message: "项目不存在" });
+    }
+
+    try {
+      return await listGitHubCommits(db, project.repoUrl, query);
+    } catch (caught) {
+      if (caught instanceof GitHubIntegrationError) {
+        return reply.code(caught.statusCode).send({ message: caught.message });
+      }
+      throw caught;
+    }
+  });
+
+  app.post("/api/projects/:id/work-items/draft", async (request, reply) => {
+    if (!(await requireUser(request, reply, db))) {
+      return;
+    }
+
+    const { id } = routeIdSchema.parse(request.params);
+    const project = await db.project.findUnique({
+      where: { id },
+      select: {
+        id: true
+      }
+    });
+    if (!project) {
+      return reply.code(404).send({ message: "项目不存在" });
+    }
+
+    const body = generateWorkItemDraftSchema.parse(request.body);
+    try {
+      return await generateWorkItemDraft(db, body.input);
+    } catch (caught) {
+      if (caught instanceof OpenAIIntegrationError) {
+        return reply.code(caught.statusCode).send({ message: caught.message });
+      }
+      throw caught;
+    }
   });
 
   app.get("/api/projects/:id/items", async (request, reply) => {

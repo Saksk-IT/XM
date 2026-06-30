@@ -1,0 +1,75 @@
+.me-hero {
+  margin-bottom: 22rpx;
+}
+
+.profile-card {
+  align-items: center;
+  display: flex;
+  gap: 18rpx;
+  margin-bottom: 20rpx;
+}
+
+.avatar {
+  align-items: center;
+  background: #0f766e;
+  border-radius: 14rpx;
+  color: #ffffff;
+  display: flex;
+  font-size: 28rpx;
+  font-weight: 900;
+  height: 80rpx;
+  justify-content: center;
+  width: 80rpx;
+}
+
+.profile-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-name {
+  color: #0f172a;
+  font-size: 31rpx;
+  font-weight: 800;
+}
+
+.profile-sub {
+  color: #64748b;
+  font-size: 24rpx;
+  margin-top: 6rpx;
+}
+
+.info-card {
+  margin-bottom: 28rpx;
+}
+
+.info-label {
+  color: #334155;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.info-value {
+  color: #0f172a;
+  font-size: 27rpx;
+  margin-top: 12rpx;
+  word-break: break-all;
+}
+
+.hint {
+  color: #64748b;
+  font-size: 23rpx;
+  line-height: 1.5;
+  margin-top: 14rpx;
+}
+
+.status-dot {
+  background: #cbd5e1;
+  border-radius: 50%;
+  height: 18rpx;
+  width: 18rpx;
+}
+
+.status-dot.online {
+  background: #22c55e;
+}

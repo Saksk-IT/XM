@@ -1,0 +1,46 @@
+.project-card {
+  margin-bottom: 0;
+}
+
+.project-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-name {
+  color: #0f172a;
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.project-desc {
+  color: #64748b;
+  font-size: 24rpx;
+  line-height: 1.45;
+  margin-top: 8rpx;
+  max-width: 500rpx;
+}
+
+.completion-pill {
+  background: #ecfeff;
+  border: 1rpx solid #a5f3fc;
+  border-radius: 12rpx;
+  color: #0e7490;
+  flex-shrink: 0;
+  font-size: 28rpx;
+  font-weight: 900;
+  padding: 12rpx 16rpx;
+}
+
+.progress-track {
+  margin-top: 22rpx;
+}
+
+.project-meta {
+  color: #64748b;
+  display: flex;
+  font-size: 23rpx;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}

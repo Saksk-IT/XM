@@ -5,6 +5,7 @@ XM is a private, single-admin, multi-project management website for personal dev
 ## Stack
 
 - React + Vite + TypeScript + Tailwind CSS
+- Native WeChat Mini Program
 - Fastify + Prisma
 - PostgreSQL
 - pnpm workspace
@@ -21,6 +22,8 @@ pnpm dev
 ```
 
 Open `http://localhost:5173` and log in with the values from `.env`.
+
+Open the WeChat Mini Program project from `apps/miniprogram`. See `docs/miniprogram.md` for local API and AppSecret configuration.
 
 ## Verification
 

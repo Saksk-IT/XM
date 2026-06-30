@@ -14,13 +14,13 @@ export default defineConfig({
     {
       command: "pnpm --filter @xm/api dev",
       url: "http://127.0.0.1:4000/api/health",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 60_000
     },
     {
       command: "pnpm --filter @xm/web exec vite --host 127.0.0.1 --port 5174 --strictPort",
       url: "http://127.0.0.1:5174",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 60_000
     }
   ],

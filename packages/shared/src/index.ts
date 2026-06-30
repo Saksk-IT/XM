@@ -143,11 +143,123 @@ export const workItemQuerySchema = z.object({
 });
 export type WorkItemQuery = z.infer<typeof workItemQuerySchema>;
 
+export const githubCommitListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  branch: z.string().trim().min(1).max(120).optional(),
+  since: isoDateSchema.optional()
+});
+export type GitHubCommitListQuery = z.infer<typeof githubCommitListQuerySchema>;
+
+export const githubCommitSchema = z.object({
+  sha: z.string(),
+  shortSha: z.string(),
+  title: z.string(),
+  message: z.string(),
+  authorName: z.string(),
+  authorEmail: z.string().nullable(),
+  authoredAt: isoDateSchema,
+  url: z.string().url(),
+  verification: z.object({
+    verified: z.boolean(),
+    reason: z.string().nullable()
+  })
+});
+export type GitHubCommit = z.infer<typeof githubCommitSchema>;
+
+export const sensitiveSettingSchema = z.object({
+  configured: z.boolean(),
+  maskedValue: z.string().nullable()
+});
+export type SensitiveSetting = z.infer<typeof sensitiveSettingSchema>;
+
+export const runtimeSettingsSchema = z.object({
+  github: z.object({
+    token: sensitiveSettingSchema,
+    configured: z.boolean(),
+    publicAccess: z.boolean()
+  }),
+  openai: z.object({
+    apiKey: sensitiveSettingSchema,
+    configured: z.boolean(),
+    baseUrl: z.string(),
+    model: z.string().nullable(),
+    baseUrlConfigured: z.boolean()
+  }),
+  wechatMiniProgram: z.object({
+    configured: z.boolean(),
+    appId: z.string(),
+    name: z.string(),
+    originalId: z.string(),
+    appSecret: sensitiveSettingSchema
+  })
+});
+export type RuntimeSettings = z.infer<typeof runtimeSettingsSchema>;
+
+const sensitiveSettingInputSchema = z.union([z.string().trim().min(1).max(1000), z.null()]).optional();
+
+export const updateRuntimeSettingsSchema = z.object({
+  github: z
+    .object({
+      token: sensitiveSettingInputSchema
+    })
+    .optional(),
+  openai: z
+    .object({
+      apiKey: sensitiveSettingInputSchema,
+      baseUrl: z.string().trim().url().or(z.literal("")).optional(),
+      model: z.string().trim().min(1).max(120).or(z.literal("")).optional()
+    })
+    .optional(),
+  wechatMiniProgram: z
+    .object({
+      appId: z.string().trim().max(120).optional(),
+      appSecret: sensitiveSettingInputSchema,
+      name: z.string().trim().max(80).optional(),
+      originalId: z.string().trim().max(120).optional()
+    })
+    .optional()
+});
+export type UpdateRuntimeSettingsInput = z.infer<typeof updateRuntimeSettingsSchema>;
+
+export const openaiModelListSchema = z.object({
+  models: z.array(z.string())
+});
+export type OpenAIModelList = z.infer<typeof openaiModelListSchema>;
+
+export const generateWorkItemDraftSchema = z.object({
+  input: z.string().trim().min(10).max(6000)
+});
+export type GenerateWorkItemDraftInput = z.infer<typeof generateWorkItemDraftSchema>;
+
+export const generatedWorkItemDraftSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(2000).default(""),
+  type: workItemTypeSchema,
+  status: workItemStatusSchema.default("PENDING"),
+  priority: prioritySchema.default("MEDIUM"),
+  notes: z.string().trim().max(4000).default(""),
+  tagNames: z.array(z.string().trim().min(1).max(32)).max(8).default([]),
+  checklist: z.array(z.string().trim().min(1).max(160)).max(12).default([])
+});
+export type GeneratedWorkItemDraft = z.infer<typeof generatedWorkItemDraftSchema>;
+
 export const loginSchema = z.object({
   username: z.string().trim().min(1),
   password: z.string().min(1)
 });
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export const miniprogramLoginSchema = z.object({
+  code: z.string().trim().min(1)
+});
+export type MiniprogramLoginInput = z.infer<typeof miniprogramLoginSchema>;
+
+export const miniprogramBindSchema = z.object({
+  bindToken: z.string().trim().min(1),
+  username: z.string().trim().min(1),
+  password: z.string().min(1)
+});
+export type MiniprogramBindInput = z.infer<typeof miniprogramBindSchema>;
 
 export const meSchema = z.object({
   id: z.string(),
@@ -155,6 +267,27 @@ export const meSchema = z.object({
   displayName: z.string()
 });
 export type Me = z.infer<typeof meSchema>;
+
+export const miniprogramAuthSuccessSchema = z.object({
+  status: z.literal("AUTHENTICATED"),
+  token: z.string(),
+  expiresAt: isoDateSchema,
+  user: meSchema
+});
+export type MiniprogramAuthSuccess = z.infer<typeof miniprogramAuthSuccessSchema>;
+
+export const miniprogramBindingRequiredSchema = z.object({
+  status: z.literal("BINDING_REQUIRED"),
+  bindToken: z.string(),
+  expiresAt: isoDateSchema
+});
+export type MiniprogramBindingRequired = z.infer<typeof miniprogramBindingRequiredSchema>;
+
+export const miniprogramAuthResponseSchema = z.discriminatedUnion("status", [
+  miniprogramAuthSuccessSchema,
+  miniprogramBindingRequiredSchema
+]);
+export type MiniprogramAuthResponse = z.infer<typeof miniprogramAuthResponseSchema>;
 
 export const createChecklistSchema = z.object({
   title: z.string().trim().min(1).max(160)

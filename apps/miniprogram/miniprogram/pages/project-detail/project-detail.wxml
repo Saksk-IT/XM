@@ -1,0 +1,89 @@
+<view class="page-shell">
+  <view wx:if="{{project}}" class="hero">
+    <view class="hero-kicker">PROJECT DETAIL</view>
+    <view class="hero-title">{{project.name}}</view>
+    <view class="hero-copy">{{project.description || "暂无项目描述"}}</view>
+    <view class="hero-grid">
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{project.stats.total}}</view>
+        <view class="hero-metric-label">全部事项</view>
+      </view>
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{project.stats.pendingBugs}}</view>
+        <view class="hero-metric-label">待修 Bug</view>
+      </view>
+      <view class="hero-metric">
+        <view class="hero-metric-value">{{project.stats.completionRate}}%</view>
+        <view class="hero-metric-label">完成率</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+
+  <view class="surface create-card">
+    <view class="row space-between form-head">
+      <view>
+        <view class="block-title">快速创建</view>
+        <view class="subtitle">先捕获事项，细节可在详情中继续完善。</view>
+      </view>
+    </view>
+    <view class="field">
+      <text class="label">标题</text>
+      <input class="input" value="{{newTitle}}" bindinput="onTitleInput" placeholder="例如：修复登录超时" />
+    </view>
+    <view class="field">
+      <text class="label">描述</text>
+      <textarea class="textarea" value="{{newDescription}}" bindinput="onDescriptionInput" placeholder="补充背景、验收点或上下文" />
+    </view>
+    <view class="picker-grid">
+      <picker range="{{typeLabels}}" value="{{newTypeIndex}}" bindchange="onTypeChange">
+        <view class="select-value">{{typeLabels[newTypeIndex]}}</view>
+      </picker>
+      <picker range="{{statusLabels}}" value="{{newStatusIndex}}" bindchange="onStatusChange">
+        <view class="select-value">{{statusLabels[newStatusIndex]}}</view>
+      </picker>
+      <picker range="{{priorityLabels}}" value="{{newPriorityIndex}}" bindchange="onPriorityChange">
+        <view class="select-value">{{priorityLabels[newPriorityIndex]}}</view>
+      </picker>
+    </view>
+    <button class="btn" loading="{{saving}}" disabled="{{saving}}" bindtap="createItem">创建任务</button>
+  </view>
+
+  <view class="surface list-panel">
+    <view class="row space-between">
+      <view class="block-title">任务流</view>
+      <view class="task-count">{{visibleItems.length}} 项</view>
+    </view>
+    <scroll-view scroll-x class="segmented-scroll">
+      <view
+        wx:for="{{filters}}"
+        wx:key="value"
+        class="segment-chip {{item.active ? 'active' : ''}}"
+        data-value="{{item.value}}"
+        bindtap="onFilterTap"
+      >
+        {{item.label}}
+      </view>
+    </scroll-view>
+
+    <view wx:if="{{!loading && visibleItems.length === 0}}" class="empty compact-empty">暂无任务</view>
+
+    <view wx:for="{{visibleItems}}" wx:key="id" class="task-card" data-id="{{item.id}}" bindtap="openItem">
+      <view class="row space-between">
+        <view class="task-title">{{item.title}}</view>
+        <view class="priority-chip {{item.priorityClass}}">{{item.priorityLabel}}</view>
+      </view>
+      <view class="task-desc">{{item.description || "暂无描述"}}</view>
+      <view class="task-tags">
+        <view class="status-chip {{item.statusClass}}">{{item.statusLabel}}</view>
+        <view class="type-chip">{{item.typeLabel}}</view>
+        <view class="type-chip">清单 {{item.checklistText}}</view>
+      </view>
+      <view class="task-foot">
+        <text>更新 {{item.updatedText}}</text>
+        <text>进度 {{item.checklistProgress}}%</text>
+      </view>
+    </view>
+  </view>
+</view>
