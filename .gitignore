@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-types
+build
+coverage
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+.DS_Store
+*.log
+apps/api/prisma/dev.db

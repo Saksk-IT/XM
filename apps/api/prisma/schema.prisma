@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkItemType {
+  BUG
+  FEATURE
+}
+
+enum WorkItemStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  displayName  String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  description String     @default("")
+  repoUrl     String?
+  repoPath    String?
+  deployUrl   String?
+  docsUrl     String?
+  color       String     @default("#0891b2")
+  archived    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workItems   WorkItem[]
+
+  @@index([archived, updatedAt])
+}
+
+model WorkItem {
+  id          String           @id @default(cuid())
+  projectId   String
+  title       String
+  description String           @default("")
+  type        WorkItemType
+  status      WorkItemStatus   @default(PENDING)
+  priority    Priority         @default(MEDIUM)
+  notes       String           @default("")
+  dueDate     DateTime?
+  order       Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tags        WorkItemTag[]
+  checklist   ChecklistItem[]
+  activities  ActivityLog[]
+
+  @@index([projectId, type, status])
+  @@index([projectId, priority])
+  @@index([projectId, order])
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  color     String
+  createdAt DateTime      @default(now())
+  workItems WorkItemTag[]
+}
+
+model WorkItemTag {
+  workItemId String
+  tagId      String
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([workItemId, tagId])
+}
+
+model ChecklistItem {
+  id         String   @id @default(cuid())
+  workItemId String
+  title      String
+  done       Boolean  @default(false)
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@index([workItemId, order])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  workItemId String
+  action     String
+  message    String
+  createdAt  DateTime @default(now())
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  @@index([workItemId, createdAt])
+}

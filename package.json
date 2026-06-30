@@ -1,0 +1,28 @@
+{
+  "name": "xm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev": "pnpm --filter @xm/shared build && dotenv -e .env.example -e .env -- pnpm --parallel --filter @xm/api --filter @xm/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm --filter @xm/shared build && pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm --filter @xm/shared build && pnpm db:push && pnpm -r test",
+    "e2e": "pnpm --filter @xm/shared build && pnpm db:push && pnpm db:seed && dotenv -e .env.example -e .env -- pnpm --filter @xm/web e2e",
+    "db:generate": "dotenv -e .env.example -e .env -- pnpm --filter @xm/api db:generate",
+    "db:push": "dotenv -e .env.example -e .env -- pnpm --filter @xm/api db:push",
+    "db:seed": "dotenv -e .env.example -e .env -- pnpm --filter @xm/api db:seed"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.0",
+    "@types/node": "^24.0.7",
+    "dotenv-cli": "^10.0.0",
+    "eslint": "^9.30.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "typescript-eslint": "^8.35.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: xm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xm
+      POSTGRES_PASSWORD: xm_password
+      POSTGRES_DB: xm
+    ports:
+      - "5432:5432"
+    volumes:
+      - xm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xm -d xm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: xm-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://xm:xm_password@postgres:5432/xm?schema=public
+      SESSION_SECRET: change-me-in-production
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123456
+      ADMIN_DISPLAY_NAME: Leo
+      API_PORT: "4000"
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+
+volumes:
+  xm_postgres_data:
