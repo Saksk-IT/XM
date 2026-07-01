@@ -129,6 +129,11 @@ export const createWorkItemSchema = z.object({
 });
 export type CreateWorkItemInput = z.infer<typeof createWorkItemSchema>;
 
+export const agentProjectInitSchema = createProjectSchema.extend({
+  initialItems: z.array(createWorkItemSchema).max(30).default([])
+});
+export type AgentProjectInitInput = z.infer<typeof agentProjectInitSchema>;
+
 export const updateWorkItemSchema = createWorkItemSchema.partial().extend({
   order: z.number().int().min(0).optional()
 });

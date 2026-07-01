@@ -14,7 +14,11 @@ After completing a user-requested feature, bug fix, or meaningful investigation,
 ## Workflow
 
 1. Identify the current repository path with `pwd`.
-2. Resolve the XM project:
+2. Collect safe project context:
+   - `git remote get-url origin` for `repoUrl` when available.
+   - `README.md`, `README.zh-CN.md`, or another obvious README for a short project description and docs/config follow-ups.
+   - `git log --oneline -n 20` for completed features and bug fixes. Do not include secrets or full private payloads.
+3. Resolve the XM project:
 
 ```bash
 curl -sS \
@@ -22,7 +26,18 @@ curl -sS \
   "$XM_AGENT_BASE_URL/api/agent/projects/resolve?repoPath=$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.getcwd()))')"
 ```
 
-3. Summarize the work into a single record:
+4. If resolve returns `404`, initialize the project:
+
+```bash
+curl -sS -X POST "$XM_AGENT_BASE_URL/api/agent/projects/init" \
+  -H "Authorization: Bearer $XM_AGENT_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$PROJECT_INIT_PAYLOAD"
+```
+
+The initialization payload uses normal project fields plus `initialItems`. Build `initialItems` from README-confirmed capabilities, explicit README TODOs, and meaningful `feat:` / `fix:` commit records. The API skips duplicate item titles for the same project.
+
+5. Summarize the current work into a single record:
    - `title`: one sentence.
    - `description`: what changed or what bug was fixed, in user-facing language.
    - `type`: `BUG` for fixes, `FEATURE` for new capability or planned enhancement.
@@ -32,7 +47,7 @@ curl -sS \
    - `tagNames`: include the product area and technical area.
    - `checklist`: include acceptance or follow-up items.
 
-4. Create the XM record:
+6. Create the XM record:
 
 ```bash
 curl -sS -X POST "$XM_AGENT_BASE_URL/api/agent/projects/$PROJECT_ID/items" \
@@ -59,6 +74,8 @@ curl -sS -X POST "$XM_AGENT_BASE_URL/api/agent/projects/$PROJECT_ID/items" \
 ## Rules
 
 - Never include secrets, cookies, tokens, or private credentials in XM records.
-- If project resolution returns `404`, report that XM has no matching project and do not create a project automatically.
+- If project resolution returns `404`, initialize the project through `/api/agent/projects/init` before creating the current work record.
+- README-derived items should only describe facts present in the README, or clear follow-ups the README explicitly implies.
+- Commit-derived items should favor meaningful `feat:` and `fix:` commits; skip merge commits, formatting-only commits, lockfile churn, and unclear messages.
 - If verification was skipped or failed, write that explicitly in `notes` and avoid `DONE` unless the user explicitly accepts the risk.
 - Keep one user request to one XM record unless the work clearly spans unrelated features or bugs.

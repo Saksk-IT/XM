@@ -920,6 +920,102 @@ describe("XM API", () => {
     expect(wrong.statusCode).toBe(401);
   });
 
+  it("initializes projects and deduplicates agent-supplied README or commit records", async () => {
+    env.agentApiToken = "test-agent-token";
+    const auth = {
+      authorization: "Bearer test-agent-token"
+    };
+    const payload = {
+      name: "FreshRepo",
+      description: "README 描述了本地开发、API 和前端结构。",
+      repoUrl: "https://github.com/example/fresh-repo.git",
+      repoPath: "/Users/sak/Documents/FreshRepo",
+      docsUrl: "https://github.com/example/fresh-repo#readme",
+      color: "#0891b2",
+      initialItems: [
+        {
+          title: "根据 README 建立项目说明",
+          description: "README 已说明项目结构和本地运行方式。",
+          type: "FEATURE",
+          status: "DONE",
+          priority: "MEDIUM",
+          notes: "来源：README.md",
+          tagNames: ["readme", "docs"],
+          checklist: ["记录项目结构", "记录本地运行命令"]
+        },
+        {
+          title: "修复登录重定向提交记录",
+          description: "提交记录显示登录后重定向问题已修复。",
+          type: "BUG",
+          status: "DONE",
+          priority: "HIGH",
+          notes: "来源：git log fix login redirect",
+          tagNames: ["git", "auth"],
+          checklist: ["读取提交记录", "写入已完成 bug"]
+        }
+      ]
+    };
+
+    const initialized = await app.inject({
+      method: "POST",
+      url: "/api/agent/projects/init",
+      headers: auth,
+      payload
+    });
+
+    expect(initialized.statusCode).toBe(201);
+    expect(initialized.json()).toMatchObject({
+      created: true,
+      skippedItemTitles: [],
+      project: {
+        name: "FreshRepo",
+        description: "README 描述了本地开发、API 和前端结构。",
+        repoPath: "/Users/sak/Documents/FreshRepo"
+      }
+    });
+    expect(initialized.json().createdItems).toHaveLength(2);
+    expect(initialized.json().project.workItems).toHaveLength(2);
+    expect(initialized.json().createdItems[0].activities[0]).toMatchObject({
+      action: "agent_initialized",
+      message: "AI agent 初始化项目记录"
+    });
+
+    const repeated = await app.inject({
+      method: "POST",
+      url: "/api/agent/projects/init",
+      headers: auth,
+      payload: {
+        ...payload,
+        description: "重复初始化不应覆盖既有说明。",
+        initialItems: [
+          payload.initialItems[0],
+          {
+            title: "补充部署配置记录",
+            description: "README 和提交记录提示后续需要统一部署配置。",
+            type: "FEATURE",
+            status: "PENDING",
+            priority: "MEDIUM",
+            notes: "来源：README.md 与 git log",
+            tagNames: ["deploy", "config"],
+            checklist: ["梳理部署变量", "补充配置文档"]
+          }
+        ]
+      }
+    });
+
+    expect(repeated.statusCode).toBe(200);
+    expect(repeated.json()).toMatchObject({
+      created: false,
+      skippedItemTitles: ["根据 README 建立项目说明"],
+      project: {
+        name: "FreshRepo",
+        description: "README 描述了本地开发、API 和前端结构。"
+      }
+    });
+    expect(repeated.json().createdItems).toHaveLength(1);
+    expect(repeated.json().project.workItems).toHaveLength(3);
+  });
+
   it("resolves projects and manages work items through the agent API", async () => {
     env.agentApiToken = "test-agent-token";
     const auth = {
