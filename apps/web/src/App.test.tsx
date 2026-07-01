@@ -9,6 +9,7 @@ const project = {
   description: "个人开发者工具箱",
   repoUrl: "https://github.com/example/devflow",
   repoPath: "/Users/sak/Documents/XM",
+  defaultBranch: "main",
   deployUrl: "https://devflow.local",
   docsUrl: "https://docs.devflow.local",
   color: "#0891b2",
@@ -80,7 +81,8 @@ const archivedProject = {
 
 function mockFetch() {
   let archived = true;
-  const projectSummary = () => ({ ...project, workItems: undefined });
+  let projectDefaultBranch = project.defaultBranch;
+  const projectSummary = () => ({ ...project, defaultBranch: projectDefaultBranch, workItems: undefined });
   const archivedSummary = () => ({ ...archivedProject, archived, workItems: undefined });
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -139,7 +141,7 @@ function mockFetch() {
     if (url === "/api/settings/openai/models") {
       return jsonResponse({ models: ["gpt-5.5", "gpt-5.5-mini"] });
     }
-    if (url === "/api/projects/project-1/github/commits?limit=5") {
+    if (url === "/api/projects/project-1/github/commits?limit=5&branch=main") {
       return jsonResponse([
         {
           sha: "abcdef1234567890",
@@ -200,8 +202,13 @@ function mockFetch() {
     if (url === "/api/projects") {
       return jsonResponse(archived ? [projectSummary()] : [projectSummary(), archivedSummary()]);
     }
+    if (url === "/api/projects/project-1" && method === "PATCH") {
+      const body = JSON.parse(String(init?.body));
+      projectDefaultBranch = body.defaultBranch ?? projectDefaultBranch;
+      return jsonResponse({ ...project, ...body, defaultBranch: projectDefaultBranch });
+    }
     if (url === "/api/projects/project-1") {
-      return jsonResponse(project);
+      return jsonResponse({ ...project, defaultBranch: projectDefaultBranch });
     }
     if (url === "/api/projects/project-archived") {
       return jsonResponse({ ...archivedProject, archived });
@@ -248,6 +255,44 @@ describe("App", () => {
     expect(within(sectionNav).getByRole("button", { name: /功能待修改/ })).toBeInTheDocument();
     expect(within(sectionNav).getByRole("button", { name: /功能已实现/ })).toBeInTheDocument();
     expect(within(sectionNav).getByRole("button", { name: /Bug 已实现/ })).toBeInTheDocument();
+  });
+
+  it("loads GitHub commits from the project default branch", async () => {
+    const fetchMock = mockFetch();
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "DevFlow" })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/projects/project-1/github/commits?limit=5&branch=main", expect.anything());
+    });
+    expect(screen.getByText("分支 main")).toBeInTheDocument();
+    expect(await screen.findByText("Fix upload retry")).toBeInTheDocument();
+  });
+
+  it("saves the project default branch from the edit dialog", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch();
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "DevFlow" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "编辑项目" }));
+    const dialog = screen.getByRole("dialog", { name: "编辑项目" });
+
+    expect(within(dialog).getByLabelText("默认分支")).toHaveValue("main");
+    await user.clear(within(dialog).getByLabelText("默认分支"));
+    await user.type(within(dialog).getByLabelText("默认分支"), "codex/xm-project-manager");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/projects/project-1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.stringContaining("\"defaultBranch\":\"codex/xm-project-manager\"")
+        })
+      );
+    });
   });
 
   it("switches between board and list views", async () => {

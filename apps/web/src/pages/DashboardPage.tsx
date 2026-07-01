@@ -463,27 +463,36 @@ function ProjectOverview({ project }: { project: ProjectDetail }) {
         <Metric label="待修改功能" value={project.stats.pendingFeatures} tone="text-feature" />
         <div className="rounded-md border border-line bg-white p-4 shadow-panel"><div className="mb-3 text-sm font-semibold">最近更新</div><div className="space-y-2">{recentItems.map((item) => <div key={item.id} className="truncate text-xs text-muted">{item.title}</div>)}</div></div>
       </div>
-      <CommitActivity projectId={project.id} repoUrl={project.repoUrl} />
+      <CommitActivity projectId={project.id} repoUrl={project.repoUrl} defaultBranch={project.defaultBranch} />
     </section>
   );
 }
 
-function CommitActivity({ projectId, repoUrl }: { projectId: string; repoUrl: string | null }) {
+function CommitActivity({
+  projectId,
+  repoUrl,
+  defaultBranch
+}: {
+  projectId: string;
+  repoUrl: string | null;
+  defaultBranch: string | null;
+}) {
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const branch = defaultBranch?.trim() || "";
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      setCommits(await api.listGitHubCommits(projectId, { limit: 5 }));
+      setCommits(await api.listGitHubCommits(projectId, { limit: 5, branch }));
     } catch (caught) {
       setCommits([]);
       setError(caught instanceof Error ? caught.message : "读取提交记录失败");
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [branch, projectId]);
   useEffect(() => {
     if (repoUrl) {
       void load();
@@ -492,7 +501,10 @@ function CommitActivity({ projectId, repoUrl }: { projectId: string; repoUrl: st
   return (
     <section className="rounded-md border border-line bg-white p-4 shadow-panel" aria-label="代码动态">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Github className="h-4 w-4" />代码动态</h2>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><Github className="h-4 w-4" />代码动态</h2>
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-muted">{branch ? `分支 ${branch}` : "仓库默认分支"}</span>
+        </div>
         <button type="button" onClick={() => void load()} disabled={loading || !repoUrl} className="focus-ring flex h-8 items-center gap-1.5 rounded-md border border-line px-2.5 text-xs font-semibold text-muted hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />刷新</button>
       </div>
       {!repoUrl ? <div className="rounded-md border border-dashed border-line px-3 py-5 text-center text-sm text-muted">项目未配置 GitHub 仓库链接</div> : null}
@@ -567,12 +579,13 @@ function ProjectModal({ title, project, onClose, onSubmit }: { title: string; pr
   const [description, setDescription] = useState(project?.description ?? "");
   const [repoUrl, setRepoUrl] = useState(project?.repoUrl ?? "");
   const [repoPath, setRepoPath] = useState(project?.repoPath ?? "");
+  const [defaultBranch, setDefaultBranch] = useState(project?.defaultBranch ?? "");
   const [deployUrl, setDeployUrl] = useState(project?.deployUrl ?? "");
   const [docsUrl, setDocsUrl] = useState(project?.docsUrl ?? "");
   const [color, setColor] = useState(project?.color ?? "#0891b2");
   const [saving, setSaving] = useState(false);
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); try { await onSubmit({ name, description, repoUrl, repoPath, deployUrl, docsUrl, color }); } finally { setSaving(false); } }
-  return <Modal title={title} onClose={onClose}><form onSubmit={submit}><Field label="项目名称"><input value={name} onChange={(event) => setName(event.target.value)} className="input" required /></Field><Field label="项目描述"><textarea value={description} onChange={(event) => setDescription(event.target.value)} className="input min-h-20" /></Field><Field label="仓库链接"><input value={repoUrl} onChange={(event) => setRepoUrl(event.target.value)} className="input" /></Field><Field label="本地仓库路径"><input value={repoPath} onChange={(event) => setRepoPath(event.target.value)} className="input" /></Field><Field label="部署链接"><input value={deployUrl} onChange={(event) => setDeployUrl(event.target.value)} className="input" /></Field><Field label="文档链接"><input value={docsUrl} onChange={(event) => setDocsUrl(event.target.value)} className="input" /></Field><Field label="项目颜色"><input type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-10 w-20 rounded-md border border-line bg-white p-1" /></Field><ModalActions onClose={onClose} saving={saving} /></form></Modal>;
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); try { await onSubmit({ name, description, repoUrl, repoPath, defaultBranch, deployUrl, docsUrl, color }); } finally { setSaving(false); } }
+  return <Modal title={title} onClose={onClose}><form onSubmit={submit}><Field label="项目名称"><input value={name} onChange={(event) => setName(event.target.value)} className="input" required /></Field><Field label="项目描述"><textarea value={description} onChange={(event) => setDescription(event.target.value)} className="input min-h-20" /></Field><Field label="仓库链接"><input value={repoUrl} onChange={(event) => setRepoUrl(event.target.value)} className="input" /></Field><Field label="本地仓库路径"><input value={repoPath} onChange={(event) => setRepoPath(event.target.value)} className="input" /></Field><Field label="默认分支"><input value={defaultBranch} onChange={(event) => setDefaultBranch(event.target.value)} className="input" placeholder="main" /></Field><Field label="部署链接"><input value={deployUrl} onChange={(event) => setDeployUrl(event.target.value)} className="input" /></Field><Field label="文档链接"><input value={docsUrl} onChange={(event) => setDocsUrl(event.target.value)} className="input" /></Field><Field label="项目颜色"><input type="color" value={color} onChange={(event) => setColor(event.target.value)} className="h-10 w-20 rounded-md border border-line bg-white p-1" /></Field><ModalActions onClose={onClose} saving={saving} /></form></Modal>;
 }
 
 function ItemModal({ projectId, preset, onClose, onSubmit }: { projectId: string; preset: ItemPreset | null; onClose: () => void; onSubmit: (input: CreateWorkItemInput) => Promise<void> }) {

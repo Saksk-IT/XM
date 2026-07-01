@@ -24,6 +24,7 @@ export type ViewMode = z.infer<typeof viewModeSchema>;
 export const isoDateSchema = z.string().datetime();
 export const optionalUrlSchema = z.string().url().or(z.literal("")).nullable().optional();
 export const optionalTextSchema = z.string().trim().max(500).or(z.literal("")).nullable().optional();
+export const optionalBranchSchema = z.string().trim().max(120).or(z.literal("")).nullable().optional();
 
 export const tagSchema = z.object({
   id: z.string(),
@@ -66,6 +67,7 @@ export const projectSummarySchema = z.object({
   description: z.string(),
   repoUrl: z.string().nullable(),
   repoPath: z.string().nullable(),
+  defaultBranch: z.string().nullable(),
   deployUrl: z.string().nullable(),
   docsUrl: z.string().nullable(),
   color: z.string(),
@@ -105,6 +107,7 @@ export const createProjectSchema = z.object({
   description: z.string().trim().max(500).default(""),
   repoUrl: optionalUrlSchema,
   repoPath: optionalTextSchema,
+  defaultBranch: optionalBranchSchema,
   deployUrl: optionalUrlSchema,
   docsUrl: optionalUrlSchema,
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default("#0891b2")

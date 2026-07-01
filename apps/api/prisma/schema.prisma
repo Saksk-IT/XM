@@ -59,6 +59,7 @@ model Project {
   description String     @default("")
   repoUrl     String?
   repoPath    String?
+  defaultBranch String?
   deployUrl   String?
   docsUrl     String?
   color       String     @default("#0891b2")

@@ -99,6 +99,7 @@ export function serializeProjectSummary(project: ProjectForStats): ProjectSummar
     description: project.description,
     repoUrl: project.repoUrl,
     repoPath: project.repoPath,
+    defaultBranch: project.defaultBranch,
     deployUrl: project.deployUrl,
     docsUrl: project.docsUrl,
     color: project.color,

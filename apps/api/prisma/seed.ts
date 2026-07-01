@@ -41,6 +41,7 @@ async function main() {
       name: "DevFlow",
       description: "个人开发者工具箱，提升日常开发效率。",
       repoUrl: "https://github.com/example/devflow",
+      defaultBranch: "main",
       deployUrl: "https://devflow.local",
       docsUrl: "https://docs.devflow.local",
       color: "#0891b2"
@@ -57,6 +58,7 @@ async function main() {
       name: "NoteCraft",
       description: "Markdown 笔记与资料归档系统。",
       repoUrl: "https://github.com/example/notecraft",
+      defaultBranch: "main",
       color: "#2563eb"
     }
   });

@@ -706,6 +706,38 @@ describe("XM API", () => {
     expect(headers.get("Accept")).toBe("application/vnd.github+json");
   });
 
+  it("uses the configured project default branch when listing GitHub commits", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const projectResponse = await app.inject({
+      method: "POST",
+      url: "/api/projects",
+      headers: {
+        cookie
+      },
+      payload: {
+        name: "DevFlow",
+        repoUrl: "https://github.com/example/devflow.git",
+        defaultBranch: "main",
+        color: "#0891b2"
+      }
+    });
+    const project = projectResponse.json();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/api/projects/${project.id}/github/commits?limit=5`,
+      headers: {
+        cookie
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    const [url] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://api.github.com/repos/example/devflow/commits?per_page=5&sha=main");
+  });
+
   it("maps GitHub repository and rate-limit errors to user-readable API responses", async () => {
     const projectResponse = await app.inject({
       method: "POST",

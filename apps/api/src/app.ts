@@ -113,6 +113,7 @@ function projectData(input: {
   description?: string;
   repoUrl?: string | null;
   repoPath?: string | null;
+  defaultBranch?: string | null;
   deployUrl?: string | null;
   docsUrl?: string | null;
   color?: string;
@@ -123,6 +124,7 @@ function projectData(input: {
     ...(input.description !== undefined ? { description: input.description } : {}),
     ...(input.repoUrl !== undefined ? { repoUrl: nullableUrl(input.repoUrl) } : {}),
     ...(input.repoPath !== undefined ? { repoPath: nullableText(input.repoPath) } : {}),
+    ...(input.defaultBranch !== undefined ? { defaultBranch: nullableText(input.defaultBranch) } : {}),
     ...(input.deployUrl !== undefined ? { deployUrl: nullableUrl(input.deployUrl) } : {}),
     ...(input.docsUrl !== undefined ? { docsUrl: nullableUrl(input.docsUrl) } : {}),
     ...(input.color !== undefined ? { color: input.color } : {}),
@@ -223,6 +225,7 @@ function projectInitPatch(
     description: string;
     repoUrl: string | null;
     repoPath: string | null;
+    defaultBranch: string | null;
     deployUrl: string | null;
     docsUrl: string | null;
   },
@@ -232,6 +235,7 @@ function projectInitPatch(
     description: existing.description.trim() ? undefined : nonEmptyText(input.description),
     repoUrl: existing.repoUrl ? undefined : nonEmptyText(input.repoUrl),
     repoPath: existing.repoPath ? undefined : nonEmptyText(input.repoPath),
+    defaultBranch: existing.defaultBranch ? undefined : nonEmptyText(input.defaultBranch),
     deployUrl: existing.deployUrl ? undefined : nonEmptyText(input.deployUrl),
     docsUrl: existing.docsUrl ? undefined : nonEmptyText(input.docsUrl)
   });
@@ -503,6 +507,7 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
         description: body.description,
         repoUrl: nullableUrl(body.repoUrl),
         repoPath: nullableText(body.repoPath),
+        defaultBranch: nullableText(body.defaultBranch),
         deployUrl: nullableUrl(body.deployUrl),
         docsUrl: nullableUrl(body.docsUrl),
         color: body.color
@@ -572,7 +577,8 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
     const project = await db.project.findUnique({
       where: { id },
       select: {
-        repoUrl: true
+        repoUrl: true,
+        defaultBranch: true
       }
     });
 
@@ -581,7 +587,10 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
     }
 
     try {
-      return await listGitHubCommits(db, project.repoUrl, query);
+      return await listGitHubCommits(db, project.repoUrl, {
+        ...query,
+        branch: query.branch ?? project.defaultBranch ?? undefined
+      });
     } catch (caught) {
       if (caught instanceof GitHubIntegrationError) {
         return reply.code(caught.statusCode).send({ message: caught.message });
@@ -906,6 +915,7 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
             description: body.description,
             repoUrl: nullableUrl(body.repoUrl),
             repoPath: nullableText(body.repoPath),
+            defaultBranch: nullableText(body.defaultBranch),
             deployUrl: nullableUrl(body.deployUrl),
             docsUrl: nullableUrl(body.docsUrl),
             color: body.color
