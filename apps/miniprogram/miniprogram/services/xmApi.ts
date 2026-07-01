@@ -1,6 +1,8 @@
 import type {
   CreateChecklistInput,
   CreateWorkItemInput,
+  GeneratedWorkItemDraft,
+  GenerateWorkItemDraftInput,
   MiniprogramAuthResponse,
   ProjectDetail,
   ProjectSummary,
@@ -29,6 +31,12 @@ export const xmApi = {
   },
   getProject(id: string) {
     return apiRequest<ProjectDetail>(`/api/projects/${id}`);
+  },
+  generateWorkItemDraft(projectId: string, input: GenerateWorkItemDraftInput) {
+    return apiRequest<GeneratedWorkItemDraft>(`/api/projects/${projectId}/work-items/draft`, {
+      method: "POST",
+      data: input
+    });
   },
   getItem(id: string) {
     return apiRequest<WorkItem>(`/api/items/${id}`);

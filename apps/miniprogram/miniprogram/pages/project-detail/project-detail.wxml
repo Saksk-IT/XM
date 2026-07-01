@@ -25,9 +25,22 @@
     <view class="row space-between form-head">
       <view>
         <view class="block-title">快速创建</view>
-        <view class="subtitle">先捕获事项，细节可在详情中继续完善。</view>
+        <view class="subtitle">先粘贴原始描述，也可以直接手动创建。</view>
       </view>
     </view>
+    <view class="field">
+      <text class="label">原始描述</text>
+      <textarea
+        class="textarea raw-textarea"
+        value="{{newRawInput}}"
+        bindinput="onRawInput"
+        placeholder="粘贴功能想法、Bug 现象或待办说明"
+      />
+    </view>
+    <view wx:if="{{draftError}}" class="draft-error">{{draftError}}</view>
+    <button class="btn btn-secondary draft-btn" loading="{{drafting}}" disabled="{{drafting}}" bindtap="generateDraft">
+      {{drafting ? "生成中" : "一键生成草稿"}}
+    </button>
     <view class="field">
       <text class="label">标题</text>
       <input class="input" value="{{newTitle}}" bindinput="onTitleInput" placeholder="例如：修复登录超时" />
@@ -46,6 +59,14 @@
       <picker range="{{priorityLabels}}" value="{{newPriorityIndex}}" bindchange="onPriorityChange">
         <view class="select-value">{{priorityLabels[newPriorityIndex]}}</view>
       </picker>
+    </view>
+    <view class="field">
+      <text class="label">标签</text>
+      <input class="input" value="{{newTags}}" bindinput="onTagsInput" placeholder="多个标签用逗号或空格分隔" />
+    </view>
+    <view class="field">
+      <text class="label">清单</text>
+      <textarea class="textarea checklist-textarea" value="{{newChecklist}}" bindinput="onChecklistInput" placeholder="每行一个验收项或待办步骤" />
     </view>
     <button class="btn" loading="{{saving}}" disabled="{{saving}}" bindtap="createItem">创建任务</button>
   </view>

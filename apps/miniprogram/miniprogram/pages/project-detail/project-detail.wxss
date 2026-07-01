@@ -6,11 +6,34 @@
   margin-bottom: 18rpx;
 }
 
+.raw-textarea {
+  min-height: 176rpx;
+}
+
+.draft-error {
+  background: #fef2f2;
+  border: 1rpx solid #fecaca;
+  border-radius: 12rpx;
+  color: #b91c1c;
+  font-size: 24rpx;
+  line-height: 1.5;
+  margin-bottom: 16rpx;
+  padding: 14rpx 18rpx;
+}
+
+.draft-btn {
+  margin-bottom: 22rpx;
+}
+
 .picker-grid {
   display: grid;
   gap: 12rpx;
   grid-template-columns: repeat(3, 1fr);
   margin-bottom: 22rpx;
+}
+
+.checklist-textarea {
+  min-height: 172rpx;
 }
 
 .list-panel {
