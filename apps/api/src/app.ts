@@ -1141,8 +1141,7 @@ export async function createApp({ db, staticRoot = staticRootDefault() }: Create
   if (existsSync(staticRoot)) {
     await app.register(fastifyStatic, {
       root: staticRoot,
-      prefix: "/",
-      decorateReply: false
+      prefix: "/"
     });
   }
 

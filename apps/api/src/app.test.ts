@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -107,6 +110,29 @@ describe("XM API", () => {
       username,
       displayName: "Leo"
     });
+  });
+
+  it("serves the built web app for project history routes", async () => {
+    const staticRoot = await mkdtemp(path.join(tmpdir(), "xm-static-"));
+    await writeFile(path.join(staticRoot, "index.html"), "<!doctype html><div id=\"root\"></div>");
+    const staticApp = await createApp({
+      db,
+      staticRoot
+    });
+
+    try {
+      const response = await staticApp.inject({
+        method: "GET",
+        url: "/projects/seed-notecraft"
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["content-type"]).toContain("text/html");
+      expect(response.body).toContain("root");
+    } finally {
+      await staticApp.close();
+      await rm(staticRoot, { recursive: true, force: true });
+    }
   });
 
   it("supports miniprogram login binding and bearer-authenticated project access", async () => {
