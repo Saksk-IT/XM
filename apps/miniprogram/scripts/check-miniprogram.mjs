@@ -55,4 +55,39 @@ for (const [passed, message] of draftChecks) {
   }
 }
 
+const configSource = readFileSync(path.join(miniprogramRoot, "core/config.ts"), "utf8");
+const appSource = readFileSync(path.join(miniprogramRoot, "app.ts"), "utf8");
+
+if (!configSource.includes("apiProfiles")) {
+  throw new Error("core/config.ts must define apiProfiles for local and preview API switching");
+}
+
+function extractProfileBaseUrl(profileName) {
+  const profilePattern = new RegExp(`${profileName}:\\s*{[\\s\\S]*?apiBaseUrl:\\s*"([^"]+)"`);
+  const match = configSource.match(profilePattern);
+  if (!match) {
+    throw new Error(`core/config.ts missing ${profileName} apiBaseUrl`);
+  }
+  return match[1];
+}
+
+const localApiBaseUrl = extractProfileBaseUrl("local");
+const previewApiBaseUrl = extractProfileBaseUrl("preview");
+
+if (!/^https?:\/\/[^/]+/.test(localApiBaseUrl)) {
+  throw new Error("local apiBaseUrl must be an absolute http(s) URL");
+}
+
+if (!previewApiBaseUrl.startsWith("https://")) {
+  throw new Error("preview apiBaseUrl must use https:// for real-device preview");
+}
+
+if (/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(previewApiBaseUrl)) {
+  throw new Error("preview apiBaseUrl must not point to localhost or 127.0.0.1");
+}
+
+if (/apiBaseUrl:\s*"https?:\/\//.test(appSource)) {
+  throw new Error("app.ts must not hardcode an API base URL; use core/config.ts");
+}
+
 stdout.write("miniprogram structure ok\n");

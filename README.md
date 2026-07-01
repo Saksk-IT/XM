@@ -23,7 +23,7 @@ pnpm dev
 
 Open `http://localhost:5173` and log in with the values from `.env`.
 
-Open the WeChat Mini Program project from `apps/miniprogram`. See `docs/miniprogram.md` for local API and AppSecret configuration.
+Open the WeChat Mini Program project from `apps/miniprogram`. See `docs/miniprogram.md` for local/preview API profiles and AppSecret configuration.
 
 ## Verification
 

@@ -24,7 +24,20 @@ pnpm db:seed
 pnpm dev
 ```
 
-本地小程序默认请求 `http://127.0.0.1:4000`。微信开发者工具本地调试时，需要在详情里开启“不校验合法域名、web-view 域名、TLS 版本以及 HTTPS 证书”。
+本地小程序 API 基地址集中在 `apps/miniprogram/miniprogram/core/config.ts`：
+
+- `apiProfiles.local`: 微信开发者工具本地调试，默认请求 `http://127.0.0.1:4000`。
+- `apiProfiles.preview`: 真机预览使用的 HTTPS API 地址，需要替换为已部署的 XM API 域名。
+- `appConfig.apiProfileMode`: 默认 `auto`，开发者工具自动使用 `local`，真机预览自动使用 `preview`。需要强制指定时可改为 `local` 或 `preview`。
+
+微信开发者工具本地调试时，需要在详情里开启“不校验合法域名、web-view 域名、TLS 版本以及 HTTPS 证书”。真机预览不能访问本机 `127.0.0.1`，必须使用 HTTPS API，并在微信公众平台配置 request 合法域名。
+
+临时调试某个 profile 时，也可以在开发者工具 Console 里写入本机 storage，不需要改 `app.ts`：
+
+```js
+wx.setStorageSync("xm:api-profile", "preview");
+wx.removeStorageSync("xm:api-profile");
+```
 
 ## 微信开发者工具
 
@@ -49,7 +62,10 @@ apps/miniprogram
 
 ## 真机预览
 
-真机预览不能直接访问本机 `127.0.0.1`。需要先部署 API 到 HTTPS 域名，并在微信公众平台配置 request 合法域名，然后把小程序 `app.ts` 中的 `apiBaseUrl` 改为对应 HTTPS 地址。
+1. 先部署 XM API 到 HTTPS 域名。
+2. 在微信公众平台配置该域名为 request 合法域名。
+3. 在 `core/config.ts` 中把 `apiProfiles.preview.apiBaseUrl` 改为该 HTTPS 域名。
+4. 保持 `appConfig.apiProfileMode` 为 `auto`，真机预览会自动使用 `preview`，不需要改 `app.ts`。
 
 ## 验证
 
@@ -57,3 +73,5 @@ apps/miniprogram
 pnpm --filter @xm/miniprogram typecheck
 pnpm --filter @xm/miniprogram test
 ```
+
+`test` 会校验小程序结构、草稿生成入口，以及 `core/config.ts` 中的 `local`/`preview` API profile；其中 `preview` 必须是 HTTPS 且不能指向 `localhost` 或 `127.0.0.1`。

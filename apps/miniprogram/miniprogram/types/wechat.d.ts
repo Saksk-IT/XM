@@ -16,6 +16,9 @@ declare const wx: {
   getStorageSync<T = unknown>(key: string): T;
   setStorageSync(key: string, value: unknown): void;
   removeStorageSync(key: string): void;
+  getSystemInfoSync?(): {
+    platform?: string;
+  };
   login(options: {
     success(result: { code: string }): void;
     fail(error: { errMsg: string }): void;

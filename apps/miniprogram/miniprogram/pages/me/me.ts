@@ -1,10 +1,10 @@
 import type { Me } from "@xm/shared";
 import type { XmApp } from "../../app";
-import { appConfig } from "../../core/config";
 import { clearSession, readAccessToken, readCurrentUser } from "../../core/session";
 
 type MeData = {
   user: Me | null;
+  apiProfileLabel: string;
   apiBaseUrl: string;
   productName: string;
   localDebugHint: string;
@@ -18,9 +18,10 @@ Page<MeData, {
 }>({
   data: {
     user: null,
+    apiProfileLabel: "",
     apiBaseUrl: "",
-    productName: appConfig.productName,
-    localDebugHint: appConfig.localDebugHint,
+    productName: "",
+    localDebugHint: "",
     loggedIn: false
   },
 
@@ -29,9 +30,13 @@ Page<MeData, {
   },
 
   refreshState() {
+    const { globalData } = getApp<XmApp>();
     this.setData({
       user: readCurrentUser(),
-      apiBaseUrl: getApp<XmApp>().globalData.apiBaseUrl,
+      apiProfileLabel: globalData.apiProfileLabel,
+      apiBaseUrl: globalData.apiBaseUrl,
+      productName: globalData.productName,
+      localDebugHint: globalData.localDebugHint,
       loggedIn: Boolean(readAccessToken())
     });
   },

@@ -15,9 +15,11 @@
 
   <view class="surface info-card">
     <view class="row space-between">
-      <view class="info-label">API 地址</view>
+      <view class="info-label">运行环境</view>
       <view class="status-dot {{loggedIn ? 'online' : ''}}"></view>
     </view>
+    <view class="info-value">{{apiProfileLabel}}</view>
+    <view class="info-label">API 地址</view>
     <view class="info-value">{{apiBaseUrl}}</view>
     <view class="hint">{{localDebugHint}}</view>
   </view>

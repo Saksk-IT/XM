@@ -1,15 +1,20 @@
-import { appConfig } from "./core/config";
+import { appConfig, resolveAppConfig, type ApiProfile } from "./core/config";
 
 export type XmApp = {
   globalData: {
+    apiProfile: ApiProfile;
+    apiProfileLabel: string;
     apiBaseUrl: string;
     productName: string;
+    localDebugHint: string;
   };
 };
 
+const runtimeConfig = resolveAppConfig();
+
 App<XmApp>({
   globalData: {
-    apiBaseUrl: appConfig.apiBaseUrl,
+    ...runtimeConfig,
     productName: appConfig.productName
   }
 });
