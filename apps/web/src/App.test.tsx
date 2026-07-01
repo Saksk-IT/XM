@@ -223,6 +223,13 @@ function jsonResponse(body: unknown, status = 200) {
   } as Response;
 }
 
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -364,6 +371,32 @@ describe("App", () => {
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining("修复上传断网重试")
+        })
+      );
+    });
+  });
+
+  it("defaults the new item due date to today before saving", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch();
+    const today = formatDateInputValue(new Date());
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "DevFlow" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^新建$/ }));
+    const dialog = screen.getByRole("dialog", { name: "新建事项" });
+
+    expect(within(dialog).getByLabelText("截止日期")).toHaveValue(today);
+
+    await user.type(within(dialog).getByLabelText("标题"), "自动填充当天日期");
+    await user.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/projects/project-1/items",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining(`"dueDate":"${new Date(`${today}T00:00:00.000Z`).toISOString()}"`)
         })
       );
     });

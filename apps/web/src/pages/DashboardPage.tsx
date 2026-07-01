@@ -57,6 +57,13 @@ type ItemPreset = {
 const sectionOrder: ProjectSection[] = ["OVERVIEW", "PENDING_BUGS", "PENDING_FEATURES", "DONE_FEATURES", "DONE_BUGS"];
 const priorityOptions: Array<Priority | "ALL"> = ["ALL", "HIGH", "MEDIUM", "LOW"];
 
+function formatDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { projectId } = useParams();
@@ -574,7 +581,7 @@ function ItemModal({ projectId, preset, onClose, onSubmit }: { projectId: string
   const [type, setType] = useState<WorkItemType>(preset?.type ?? "FEATURE");
   const [status, setStatus] = useState<WorkItemStatus>(preset?.status ?? "PENDING");
   const [priority, setPriority] = useState<Priority>("MEDIUM");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(() => formatDateInputValue(new Date()));
   const [tagNames, setTagNames] = useState("");
   const [checklist, setChecklist] = useState("");
   const [notes, setNotes] = useState("");
