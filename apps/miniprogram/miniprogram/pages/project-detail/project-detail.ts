@@ -1,17 +1,20 @@
-import type { GeneratedWorkItemDraft, Priority, ProjectDetail, WorkItemStatus, WorkItemType } from "@xm/shared";
+import type { GeneratedWorkItemDraft, Priority, ProjectDetail, ProjectSection, WorkItemStatus, WorkItemType } from "@xm/shared";
 import {
+  createProjectSectionFilters,
+  defaultProjectSection,
   filterItemCards,
-  filterOptions,
   parseTagNames,
   priorityLabels,
   priorityOptions,
+  resolveProjectSection,
+  sectionLabels,
   statusLabels,
   statusOptions,
   toItemCard,
   typeLabels,
   typeOptions,
-  type FilterValue,
-  type ItemCard
+  type ItemCard,
+  type SectionOption
 } from "../../domain/projectView";
 import { ensureSignedIn } from "../../core/session";
 import { xmApi } from "../../services/xmApi";
@@ -21,9 +24,11 @@ type ProjectDetailData = {
   project: ProjectDetail | null;
   items: ItemCard[];
   visibleItems: ItemCard[];
-  filters: Array<{ value: FilterValue; label: string; active: boolean }>;
-  filterLabels: string[];
-  filterIndex: number;
+  sections: SectionOption[];
+  activeSection: ProjectSection;
+  activeSectionLabel: string;
+  activeSectionCount: number;
+  showOverview: boolean;
   typeLabels: string[];
   statusLabels: string[];
   priorityLabels: string[];
@@ -60,7 +65,7 @@ function checklistToText(checklist: string[]): string {
 
 Page<ProjectDetailData, {
   loadProject(): Promise<void>;
-  onFilterTap(event: { currentTarget: { dataset: { value?: FilterValue } } }): void;
+  onSectionTap(event: { currentTarget: { dataset: { value?: string } } }): void;
   onRawInput(event: { detail: { value: string } }): void;
   onTitleInput(event: { detail: { value: string } }): void;
   onDescriptionInput(event: { detail: { value: string } }): void;
@@ -79,9 +84,11 @@ Page<ProjectDetailData, {
     project: null,
     items: [],
     visibleItems: [],
-    filters: filterOptions.map((filter, index) => ({ ...filter, active: index === 0 })),
-    filterLabels: filterOptions.map((filter) => filter.label),
-    filterIndex: 0,
+    sections: createProjectSectionFilters(null, defaultProjectSection),
+    activeSection: defaultProjectSection,
+    activeSectionLabel: sectionLabels[defaultProjectSection],
+    activeSectionCount: 0,
+    showOverview: true,
     typeLabels: typeOptions.map((type) => typeLabels[type]),
     statusLabels: statusOptions.map((status) => statusLabels[status]),
     priorityLabels: priorityOptions.map((priority) => priorityLabels[priority]),
@@ -124,11 +131,17 @@ Page<ProjectDetailData, {
     try {
       const project = await xmApi.getProject(this.data.projectId);
       const rows = project.workItems.map(toItemCard);
-      const filter = filterOptions[this.data.filterIndex]?.value ?? "ALL";
+      const activeSection = this.data.activeSection;
+      const sections = createProjectSectionFilters(project, activeSection);
+      const activeSectionCount = sections.find((section) => section.value === activeSection)?.count ?? 0;
       this.setData({
         project,
         items: rows,
-        visibleItems: filterItemCards(rows, filter),
+        visibleItems: filterItemCards(rows, activeSection),
+        sections,
+        activeSectionLabel: sectionLabels[activeSection],
+        activeSectionCount,
+        showOverview: activeSection === "OVERVIEW",
         loading: false
       });
     } catch (caught) {
@@ -139,13 +152,17 @@ Page<ProjectDetailData, {
     }
   },
 
-  onFilterTap(event) {
-    const value = event.currentTarget.dataset.value ?? "ALL";
-    const filterIndex = Math.max(0, filterOptions.findIndex((filter) => filter.value === value));
+  onSectionTap(event) {
+    const activeSection = resolveProjectSection(event.currentTarget.dataset.value);
+    const sections = createProjectSectionFilters(this.data.project, activeSection);
+    const activeSectionCount = sections.find((section) => section.value === activeSection)?.count ?? 0;
     this.setData({
-      filterIndex,
-      filters: filterOptions.map((filter, index) => ({ ...filter, active: index === filterIndex })),
-      visibleItems: filterItemCards(this.data.items, value)
+      activeSection,
+      activeSectionLabel: sectionLabels[activeSection],
+      activeSectionCount,
+      showOverview: activeSection === "OVERVIEW",
+      sections,
+      visibleItems: filterItemCards(this.data.items, activeSection)
     });
   },
 

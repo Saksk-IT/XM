@@ -1,25 +1,33 @@
-import type { ChecklistItem, Priority, ProjectSummary, WorkItem, WorkItemStatus, WorkItemType } from "@xm/shared";
+import type { ChecklistItem, Priority, ProjectSection, ProjectSummary, WorkItem, WorkItemStatus, WorkItemType } from "@xm/shared";
+import {
+  countProjectSectionItems,
+  matchesProjectSection,
+  projectSectionOrder,
+  sectionLabels
+} from "@xm/shared/projectSections";
+
+export { sectionLabels };
 
 export const typeOptions: WorkItemType[] = ["FEATURE", "BUG"];
 export const statusOptions: WorkItemStatus[] = ["PENDING", "IN_PROGRESS", "DONE"];
 export const priorityOptions: Priority[] = ["HIGH", "MEDIUM", "LOW"];
 
-export const typeLabels: Record<WorkItemType, string> = {
+export const typeLabels = {
   BUG: "Bug",
   FEATURE: "功能"
-};
+} as const satisfies Record<WorkItemType, string>;
 
-export const statusLabels: Record<WorkItemStatus, string> = {
+export const statusLabels = {
   PENDING: "待处理",
   IN_PROGRESS: "进行中",
   DONE: "已完成"
-};
+} as const satisfies Record<WorkItemStatus, string>;
 
-export const priorityLabels: Record<Priority, string> = {
+export const priorityLabels = {
   HIGH: "高",
   MEDIUM: "中",
   LOW: "低"
-};
+} as const satisfies Record<Priority, string>;
 
 export type ProjectCard = ProjectSummary & {
   completionText: string;
@@ -36,11 +44,11 @@ export type ProjectOverview = {
   averageCompletion: number;
 };
 
-export type FilterValue = "ALL" | WorkItemStatus;
-
-export type FilterOption = {
-  value: FilterValue;
+export type SectionOption = {
+  value: ProjectSection;
   label: string;
+  count: number;
+  active: boolean;
 };
 
 export type ItemCard = WorkItem & {
@@ -54,12 +62,20 @@ export type ItemCard = WorkItem & {
   updatedText: string;
 };
 
-export const filterOptions: FilterOption[] = [
-  { value: "ALL", label: "全部" },
-  { value: "PENDING", label: "待处理" },
-  { value: "IN_PROGRESS", label: "进行中" },
-  { value: "DONE", label: "已完成" }
-];
+export const defaultProjectSection: ProjectSection = "OVERVIEW";
+
+export function resolveProjectSection(value: string | undefined): ProjectSection {
+  return projectSectionOrder.includes(value as ProjectSection) ? (value as ProjectSection) : defaultProjectSection;
+}
+
+export function createProjectSectionFilters(project: ProjectSummary | null, activeSection: ProjectSection): SectionOption[] {
+  return projectSectionOrder.map((section) => ({
+    value: section,
+    label: sectionLabels[section],
+    count: project ? countProjectSectionItems(project.stats, section) : 0,
+    active: section === activeSection
+  }));
+}
 
 export function toProjectCard(project: ProjectSummary): ProjectCard {
   const doneCount = project.stats.doneFeatures + project.stats.doneBugs;
@@ -108,12 +124,8 @@ export function toItemCard(item: WorkItem): ItemCard {
   };
 }
 
-export function filterItemCards(rows: ItemCard[], filter: FilterValue): ItemCard[] {
-  if (filter === "ALL") {
-    return rows;
-  }
-
-  return rows.filter((item) => item.status === filter);
+export function filterItemCards(rows: ItemCard[], section: ProjectSection): ItemCard[] {
+  return rows.filter((item) => matchesProjectSection(item, section));
 }
 
 export function parseTagNames(value: string): string[] {

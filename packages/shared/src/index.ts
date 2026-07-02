@@ -309,13 +309,17 @@ export const updateChecklistSchema = z.object({
 });
 export type UpdateChecklistInput = z.infer<typeof updateChecklistSchema>;
 
-export const sectionLabels: Record<ProjectSection, string> = {
-  OVERVIEW: "基础项目预览",
-  PENDING_BUGS: "Bug 待修改",
-  PENDING_FEATURES: "功能待修改",
-  DONE_FEATURES: "功能已实现",
-  DONE_BUGS: "Bug 已实现"
-};
+export {
+  countProjectSectionItems,
+  matchesProjectSection,
+  projectSectionLabels,
+  projectSectionOrder,
+  projectWorkItemSections,
+  sectionLabels,
+  workItemSectionOrder,
+  type ProjectWorkItemSection,
+  type WorkItemSection
+} from "./projectSections";
 
 export const priorityLabels: Record<Priority, string> = {
   LOW: "低",

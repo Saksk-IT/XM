@@ -37,6 +37,7 @@ for (const tab of appConfig.tabBar.list) {
 
 const projectDetailTs = readFileSync(path.join(miniprogramRoot, "pages/project-detail/project-detail.ts"), "utf8");
 const projectDetailWxml = readFileSync(path.join(miniprogramRoot, "pages/project-detail/project-detail.wxml"), "utf8");
+const projectViewDomain = readFileSync(path.join(miniprogramRoot, "domain/projectView.ts"), "utf8");
 const xmApiTs = readFileSync(path.join(miniprogramRoot, "services/xmApi.ts"), "utf8");
 
 const draftChecks = [
@@ -50,6 +51,27 @@ const draftChecks = [
 ];
 
 for (const [passed, message] of draftChecks) {
+  if (!passed) {
+    throw new Error(message);
+  }
+}
+
+const sectionChecks = [
+  [projectViewDomain.includes("sectionLabels"), "project view domain must reuse shared section labels"],
+  [projectViewDomain.includes("projectSectionOrder"), "project view domain must reuse shared section order"],
+  [projectViewDomain.includes("matchesProjectSection"), "project view domain must reuse shared section matching"],
+  [projectViewDomain.includes("createProjectSectionFilters"), "project view domain missing section filter builder"],
+  [projectDetailTs.includes("activeSection"), "project detail missing active section state"],
+  [projectDetailTs.includes("createProjectSectionFilters"), "project detail missing section filter builder"],
+  [projectDetailTs.includes("onSectionTap"), "project detail missing section tap handler"],
+  [projectDetailTs.includes("filterItemCards(rows, activeSection)"), "project detail must filter rows by active section"],
+  [projectDetailWxml.includes('aria-label="项目分区"'), "project detail missing section navigation label"],
+  [projectDetailWxml.includes('bindtap="onSectionTap"'), "project detail missing section tap binding"],
+  [projectDetailWxml.includes("section-count"), "project detail missing section counts"],
+  [projectDetailWxml.includes("基础项目预览"), "project detail missing overview section copy"]
+];
+
+for (const [passed, message] of sectionChecks) {
   if (!passed) {
     throw new Error(message);
   }

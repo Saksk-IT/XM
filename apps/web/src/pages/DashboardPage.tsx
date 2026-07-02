@@ -42,7 +42,7 @@ import type {
   WorkItemStatus,
   WorkItemType
 } from "@xm/shared";
-import { priorityLabels, sectionLabels, statusLabels, typeLabels } from "@xm/shared";
+import { countProjectSectionItems, priorityLabels, projectSectionOrder, sectionLabels, statusLabels, typeLabels } from "@xm/shared";
 import { api, ApiError } from "../api/client";
 import { Field, Metric, Modal, ModalActions, PriorityBadge } from "../components/ui";
 import { readStoredBoolean, writeStoredBoolean } from "../lib/storage";
@@ -54,7 +54,6 @@ type ItemPreset = {
   status: WorkItemStatus;
 };
 
-const sectionOrder: ProjectSection[] = ["OVERVIEW", "PENDING_BUGS", "PENDING_FEATURES", "DONE_FEATURES", "DONE_BUGS"];
 const priorityOptions: Array<Priority | "ALL"> = ["ALL", "HIGH", "MEDIUM", "LOW"];
 
 function formatDateInputValue(date: Date) {
@@ -613,8 +612,7 @@ function ItemFields({ type, status, priority, dueDate, onType, onStatus, onPrior
 }
 
 function SectionTabs({ activeSection, project, onChange }: { activeSection: ProjectSection; project: ProjectDetail; onChange: (section: ProjectSection) => void }) {
-  const counts: Record<ProjectSection, number> = { OVERVIEW: project.stats.total, PENDING_BUGS: project.stats.pendingBugs, PENDING_FEATURES: project.stats.pendingFeatures, DONE_FEATURES: project.stats.doneFeatures, DONE_BUGS: project.stats.doneBugs };
-  return <nav className="flex gap-2 overflow-x-auto border-b border-line px-4 scrollbar-thin" aria-label="项目分区">{sectionOrder.map((section) => <button key={section} onClick={() => onChange(section)} className={`focus-ring flex h-14 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-medium ${activeSection === section ? "border-feature text-feature" : "border-transparent text-muted hover:text-ink"}`}>{sectionIcon(section)}{sectionLabels[section]}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-muted">{counts[section]}</span></button>)}</nav>;
+  return <nav className="flex gap-2 overflow-x-auto border-b border-line px-4 scrollbar-thin" aria-label="项目分区">{projectSectionOrder.map((section) => <button key={section} onClick={() => onChange(section)} className={`focus-ring flex h-14 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-medium ${activeSection === section ? "border-feature text-feature" : "border-transparent text-muted hover:text-ink"}`}>{sectionIcon(section)}{sectionLabels[section]}<span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-muted">{countProjectSectionItems(project.stats, section)}</span></button>)}</nav>;
 }
 
 function sectionIcon(section: ProjectSection) {

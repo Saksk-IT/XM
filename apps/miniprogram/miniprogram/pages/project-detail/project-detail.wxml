@@ -73,22 +73,47 @@
 
   <view class="surface list-panel">
     <view class="row space-between">
-      <view class="block-title">任务流</view>
-      <view class="task-count">{{visibleItems.length}} 项</view>
+      <view>
+        <view class="block-title">分区浏览</view>
+        <view class="subtitle">按网页端一致的项目分区查看任务。</view>
+      </view>
+      <view class="task-count">{{activeSectionCount}} 项</view>
     </view>
-    <scroll-view scroll-x class="segmented-scroll">
+    <scroll-view scroll-x class="section-scroll" aria-label="项目分区">
       <view
-        wx:for="{{filters}}"
+        wx:for="{{sections}}"
         wx:key="value"
-        class="segment-chip {{item.active ? 'active' : ''}}"
+        class="section-chip {{item.active ? 'active' : ''}}"
         data-value="{{item.value}}"
-        bindtap="onFilterTap"
+        bindtap="onSectionTap"
       >
-        {{item.label}}
+        <text class="section-label">{{item.label}}</text>
+        <text class="section-count">{{item.count}}</text>
       </view>
     </scroll-view>
 
-    <view wx:if="{{!loading && visibleItems.length === 0}}" class="empty compact-empty">暂无任务</view>
+    <view wx:if="{{showOverview && project}}" class="overview-strip">
+      <view class="overview-title">基础项目预览</view>
+      <view class="overview-desc">{{project.description || "暂无项目描述"}}</view>
+      <view class="overview-grid">
+        <view class="overview-metric">
+          <view class="overview-value">{{project.stats.pendingFeatures}}</view>
+          <view class="overview-label">功能待修改</view>
+        </view>
+        <view class="overview-metric">
+          <view class="overview-value">{{project.stats.doneFeatures}}</view>
+          <view class="overview-label">功能已实现</view>
+        </view>
+        <view class="overview-metric">
+          <view class="overview-value">{{project.stats.doneBugs}}</view>
+          <view class="overview-label">Bug 已修复</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="section-heading">{{showOverview ? "全部任务" : activeSectionLabel}}</view>
+
+    <view wx:if="{{!loading && visibleItems.length === 0}}" class="empty compact-empty">暂无{{activeSectionLabel}}任务</view>
 
     <view wx:for="{{visibleItems}}" wx:key="id" class="task-card" data-id="{{item.id}}" bindtap="openItem">
       <view class="row space-between">

@@ -254,7 +254,7 @@ describe("App", () => {
     expect(within(sectionNav).getByRole("button", { name: /Bug 待修改/ })).toBeInTheDocument();
     expect(within(sectionNav).getByRole("button", { name: /功能待修改/ })).toBeInTheDocument();
     expect(within(sectionNav).getByRole("button", { name: /功能已实现/ })).toBeInTheDocument();
-    expect(within(sectionNav).getByRole("button", { name: /Bug 已实现/ })).toBeInTheDocument();
+    expect(within(sectionNav).getByRole("button", { name: /Bug 已修复/ })).toBeInTheDocument();
   });
 
   it("loads GitHub commits from the project default branch", async () => {
