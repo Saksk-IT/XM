@@ -1,11 +1,13 @@
 import type { ChecklistItem, Priority, WorkItem, WorkItemStatus, WorkItemType } from "@xm/shared";
 import {
   checklistDoneText,
+  formatWorkItemDueDateInput,
   parseTagNames,
   priorityLabels,
   priorityOptions,
   statusLabels,
   statusOptions,
+  toWorkItemDueDateIso,
   typeLabels,
   typeOptions
 } from "../../domain/projectView";
@@ -19,6 +21,7 @@ type ItemDetailData = {
   title: string;
   description: string;
   notes: string;
+  dueDate: string;
   tagNamesText: string;
   typeIndex: number;
   statusIndex: number;
@@ -47,6 +50,7 @@ Page<ItemDetailData, {
   onTitleInput(event: { detail: { value: string } }): void;
   onDescriptionInput(event: { detail: { value: string } }): void;
   onNotesInput(event: { detail: { value: string } }): void;
+  onDueDateChange(event: { detail: { value: string } }): void;
   onTagsInput(event: { detail: { value: string } }): void;
   onTypeChange(event: { detail: { value: string } }): void;
   onStatusChange(event: { detail: { value: string } }): void;
@@ -63,6 +67,7 @@ Page<ItemDetailData, {
     title: "",
     description: "",
     notes: "",
+    dueDate: "",
     tagNamesText: "",
     typeIndex: 0,
     statusIndex: 0,
@@ -112,6 +117,7 @@ Page<ItemDetailData, {
       title: item.title,
       description: item.description,
       notes: item.notes,
+      dueDate: formatWorkItemDueDateInput(item.dueDate),
       tagNamesText: tagsToText(item),
       typeIndex: indexOfValue(typeOptions, item.type),
       statusIndex: indexOfValue(statusOptions, item.status),
@@ -129,6 +135,10 @@ Page<ItemDetailData, {
 
   onNotesInput(event) {
     this.setData({ notes: event.detail.value });
+  },
+
+  onDueDateChange(event) {
+    this.setData({ dueDate: event.detail.value });
   },
 
   onTagsInput(event) {
@@ -163,6 +173,7 @@ Page<ItemDetailData, {
         type: (typeOptions[this.data.typeIndex] ?? "FEATURE") as WorkItemType,
         status: (statusOptions[this.data.statusIndex] ?? "PENDING") as WorkItemStatus,
         priority: (priorityOptions[this.data.priorityIndex] ?? "MEDIUM") as Priority,
+        dueDate: toWorkItemDueDateIso(this.data.dueDate),
         tagNames: parseTagNames(this.data.tagNamesText)
       });
       this.fillForm(item);

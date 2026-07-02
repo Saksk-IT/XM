@@ -3,6 +3,7 @@ import {
   createProjectSectionFilters,
   defaultProjectSection,
   filterItemCards,
+  formatDateInputValue,
   parseTagNames,
   priorityLabels,
   priorityOptions,
@@ -11,6 +12,7 @@ import {
   statusLabels,
   statusOptions,
   toItemCard,
+  toWorkItemDueDateIso,
   typeLabels,
   typeOptions,
   type ItemCard,
@@ -37,6 +39,7 @@ type ProjectDetailData = {
   newTypeIndex: number;
   newStatusIndex: number;
   newPriorityIndex: number;
+  newDueDate: string;
   newRawInput: string;
   newTags: string;
   newChecklist: string;
@@ -74,6 +77,7 @@ Page<ProjectDetailData, {
   onTypeChange(event: { detail: { value: string } }): void;
   onStatusChange(event: { detail: { value: string } }): void;
   onPriorityChange(event: { detail: { value: string } }): void;
+  onNewDueDateChange(event: { detail: { value: string } }): void;
   generateDraft(): Promise<void>;
   applyDraft(draft: GeneratedWorkItemDraft): void;
   createItem(): Promise<void>;
@@ -97,6 +101,7 @@ Page<ProjectDetailData, {
     newTypeIndex: 0,
     newStatusIndex: 0,
     newPriorityIndex: 1,
+    newDueDate: formatDateInputValue(new Date()),
     newRawInput: "",
     newTags: "",
     newChecklist: "",
@@ -110,7 +115,7 @@ Page<ProjectDetailData, {
 
   onLoad(query) {
     const projectId = query?.id ?? "";
-    this.setData({ projectId });
+    this.setData({ projectId, newDueDate: formatDateInputValue(new Date()) });
     if (projectId && ensureSignedIn()) {
       void this.loadProject();
     }
@@ -198,6 +203,10 @@ Page<ProjectDetailData, {
     this.setData({ newPriorityIndex: Number(event.detail.value) });
   },
 
+  onNewDueDateChange(event) {
+    this.setData({ newDueDate: event.detail.value });
+  },
+
   async generateDraft() {
     const input = this.data.newRawInput.trim();
     if (!this.data.projectId) {
@@ -253,6 +262,7 @@ Page<ProjectDetailData, {
         status: (statusOptions[this.data.newStatusIndex] ?? "PENDING") as WorkItemStatus,
         priority: (priorityOptions[this.data.newPriorityIndex] ?? "MEDIUM") as Priority,
         notes: this.data.newNotes.trim(),
+        dueDate: toWorkItemDueDateIso(this.data.newDueDate),
         tagNames: parseTagNames(this.data.newTags),
         checklist: splitChecklist(this.data.newChecklist)
       });
@@ -260,6 +270,7 @@ Page<ProjectDetailData, {
         newRawInput: "",
         newTitle: "",
         newDescription: "",
+        newDueDate: formatDateInputValue(new Date()),
         newTags: "",
         newChecklist: "",
         newNotes: "",

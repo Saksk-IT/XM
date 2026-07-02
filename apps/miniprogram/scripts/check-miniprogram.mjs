@@ -37,6 +37,8 @@ for (const tab of appConfig.tabBar.list) {
 
 const projectDetailTs = readFileSync(path.join(miniprogramRoot, "pages/project-detail/project-detail.ts"), "utf8");
 const projectDetailWxml = readFileSync(path.join(miniprogramRoot, "pages/project-detail/project-detail.wxml"), "utf8");
+const itemDetailTs = readFileSync(path.join(miniprogramRoot, "pages/item-detail/item-detail.ts"), "utf8");
+const itemDetailWxml = readFileSync(path.join(miniprogramRoot, "pages/item-detail/item-detail.wxml"), "utf8");
 const projectViewDomain = readFileSync(path.join(miniprogramRoot, "domain/projectView.ts"), "utf8");
 const xmApiTs = readFileSync(path.join(miniprogramRoot, "services/xmApi.ts"), "utf8");
 
@@ -72,6 +74,27 @@ const sectionChecks = [
 ];
 
 for (const [passed, message] of sectionChecks) {
+  if (!passed) {
+    throw new Error(message);
+  }
+}
+
+const dueDateChecks = [
+  [projectViewDomain.includes("formatDateInputValue"), "project view domain missing date input formatter"],
+  [projectViewDomain.includes("toWorkItemDueDateIso"), "project view domain missing due date payload formatter"],
+  [projectDetailTs.includes("newDueDate"), "project detail missing new item due date state"],
+  [projectDetailTs.includes("formatDateInputValue(new Date())"), "project detail must default new item due date to today"],
+  [projectDetailTs.includes("dueDate: toWorkItemDueDateIso(this.data.newDueDate)"), "project detail must submit dueDate through shared formatter"],
+  [projectDetailWxml.includes('mode="date"'), "project detail missing due date picker"],
+  [projectDetailWxml.includes('bindchange="onNewDueDateChange"'), "project detail missing new due date binding"],
+  [itemDetailTs.includes("dueDate"), "item detail missing due date state"],
+  [itemDetailTs.includes("formatWorkItemDueDateInput(item.dueDate)"), "item detail must load due date from item"],
+  [itemDetailTs.includes("dueDate: toWorkItemDueDateIso(this.data.dueDate)"), "item detail must submit dueDate updates"],
+  [itemDetailWxml.includes("截止日期"), "item detail missing due date label"],
+  [itemDetailWxml.includes('bindchange="onDueDateChange"'), "item detail missing due date binding"]
+];
+
+for (const [passed, message] of dueDateChecks) {
   if (!passed) {
     throw new Error(message);
   }

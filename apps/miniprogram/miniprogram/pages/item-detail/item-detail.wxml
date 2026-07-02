@@ -28,6 +28,12 @@
       </picker>
     </view>
     <view class="field">
+      <text class="label">截止日期</text>
+      <picker mode="date" value="{{dueDate}}" bindchange="onDueDateChange">
+        <view class="select-value">{{dueDate || "未设置"}}</view>
+      </picker>
+    </view>
+    <view class="field">
       <text class="label">标签</text>
       <input class="input" value="{{tagNamesText}}" bindinput="onTagsInput" placeholder="多个标签用逗号分隔" />
     </view>

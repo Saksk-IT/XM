@@ -137,6 +137,31 @@ export function checklistDoneText(checklist: ChecklistItem[]): string {
   return `${done}/${checklist.length}`;
 }
 
+export function formatDateInputValue(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+export function formatWorkItemDueDateInput(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatDateInputValue(date);
+}
+
+export function toWorkItemDueDateIso(value: string): string | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "未设置";
@@ -147,7 +172,5 @@ export function formatDate(value: string | null | undefined): string {
     return "未设置";
   }
 
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  return formatDateInputValue(date);
 }
