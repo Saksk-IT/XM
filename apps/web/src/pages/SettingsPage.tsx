@@ -20,6 +20,13 @@ import { Metric } from "../components/ui";
 import { readStoredBoolean, writeStoredBoolean } from "../lib/storage";
 
 type SettingsSection = "layout" | "archive" | "account" | "integrations";
+type IntegrationCheckStatus = "success" | "error" | "skipped";
+type IntegrationCheckResult = {
+  id: "github" | "openai";
+  title: string;
+  status: IntegrationCheckStatus;
+  message: string;
+};
 
 const sections: Array<{ id: SettingsSection; label: string }> = [
   { id: "layout", label: "布局" },
@@ -27,6 +34,7 @@ const sections: Array<{ id: SettingsSection; label: string }> = [
   { id: "account", label: "账号" },
   { id: "integrations", label: "集成" }
 ];
+const integrationDraftVerificationInput = "运行时配置已保存，请验证 OpenAI 草稿生成能力并返回一个简短事项草稿。";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -208,7 +216,7 @@ export function SettingsPage() {
 
               {activeSection === "integrations" ? (
                 <SettingsCard title="集成状态" icon={<Settings2 className="h-4 w-4" />}>
-                  {runtime ? <IntegrationSettingsForm runtime={runtime} onSaved={setRuntime} /> : null}
+                  {runtime ? <IntegrationSettingsForm runtime={runtime} projects={projects} onSaved={setRuntime} /> : null}
                 </SettingsCard>
               ) : null}
             </>
@@ -294,9 +302,11 @@ function IntegrationRow({
 
 function IntegrationSettingsForm({
   runtime,
+  projects,
   onSaved
 }: {
   runtime: RuntimeSettings;
+  projects: ProjectSummary[];
   onSaved: (settings: RuntimeSettings) => void;
 }) {
   const [githubToken, setGithubToken] = useState("");
@@ -310,8 +320,18 @@ function IntegrationSettingsForm({
   const [models, setModels] = useState<string[]>([]);
   const [modelsError, setModelsError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkResults, setCheckResults] = useState<IntegrationCheckResult[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [message, setMessage] = useState("");
+  const githubProject = useMemo(
+    () => projects.find((project) => !project.archived && project.repoUrl) ?? projects.find((project) => project.repoUrl) ?? null,
+    [projects]
+  );
+  const draftProject = useMemo(
+    () => projects.find((project) => !project.archived) ?? projects[0] ?? null,
+    [projects]
+  );
 
   useEffect(() => {
     setOpenaiBaseUrl(runtime.openai.baseUrl);
@@ -323,6 +343,8 @@ function IntegrationSettingsForm({
 
   async function save() {
     setSaving(true);
+    setChecking(false);
+    setCheckResults([]);
     setMessage("");
     try {
       const next = await api.updateRuntimeSettings({
@@ -343,11 +365,16 @@ function IntegrationSettingsForm({
       setOpenaiApiKey("");
       setWechatAppSecret("");
       onSaved(next);
-      setMessage("配置已保存");
+      setSaving(false);
+      setChecking(true);
+      setMessage("配置已保存，正在验证 GitHub 和 OpenAI...");
+      setCheckResults(await verifySavedIntegrations(githubProject, draftProject));
+      setMessage("配置已保存，验证完成");
     } catch (caught) {
       setMessage(caught instanceof Error ? caught.message : "保存配置失败");
     } finally {
       setSaving(false);
+      setChecking(false);
     }
   }
 
@@ -369,6 +396,8 @@ function IntegrationSettingsForm({
 
   async function clearSecret(kind: "github" | "openai" | "wechat") {
     setSaving(true);
+    setChecking(false);
+    setCheckResults([]);
     setMessage("");
     try {
       const next = await api.updateRuntimeSettings({
@@ -467,16 +496,136 @@ function IntegrationSettingsForm({
       </div>
 
       {message ? <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-muted">{message}</div> : null}
+      <IntegrationCheckResults checking={checking} results={checkResults} />
       <button
         type="submit"
-        disabled={saving}
+        disabled={saving || checking}
         className="focus-ring flex h-10 items-center gap-2 rounded-md bg-feature px-4 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
       >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-        保存配置
+        {saving || checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+        {saving ? "保存中" : checking ? "验证中" : "保存配置"}
       </button>
     </form>
   );
+}
+
+async function verifySavedIntegrations(
+  githubProject: ProjectSummary | null,
+  draftProject: ProjectSummary | null
+): Promise<IntegrationCheckResult[]> {
+  const results = await Promise.all([
+    verifyGitHubCommitReading(githubProject),
+    verifyOpenAIDraftGeneration(draftProject)
+  ]);
+  return results;
+}
+
+async function verifyGitHubCommitReading(project: ProjectSummary | null): Promise<IntegrationCheckResult> {
+  if (!project) {
+    return {
+      id: "github",
+      title: "GitHub 提交读取",
+      status: "skipped",
+      message: "当前没有配置 GitHub 仓库链接的项目。"
+    };
+  }
+
+  try {
+    const commits = await api.listGitHubCommits(project.id, { limit: 1, branch: project.defaultBranch ?? undefined });
+    return {
+      id: "github",
+      title: "GitHub 提交读取",
+      status: "success",
+      message: commits.length > 0 ? `读取到 ${commits.length} 条提交。` : "请求成功，仓库暂未返回提交记录。"
+    };
+  } catch (caught) {
+    return {
+      id: "github",
+      title: "GitHub 提交读取",
+      status: "error",
+      message: caught instanceof Error ? caught.message : "读取 GitHub 提交失败"
+    };
+  }
+}
+
+async function verifyOpenAIDraftGeneration(project: ProjectSummary | null): Promise<IntegrationCheckResult> {
+  if (!project) {
+    return {
+      id: "openai",
+      title: "OpenAI 草稿生成",
+      status: "skipped",
+      message: "当前没有可用于生成草稿的项目。"
+    };
+  }
+
+  try {
+    const draft = await api.generateWorkItemDraft(project.id, { input: integrationDraftVerificationInput });
+    return {
+      id: "openai",
+      title: "OpenAI 草稿生成",
+      status: "success",
+      message: `已生成草稿“${draft.title}”。`
+    };
+  } catch (caught) {
+    return {
+      id: "openai",
+      title: "OpenAI 草稿生成",
+      status: "error",
+      message: caught instanceof Error ? caught.message : "生成 OpenAI 草稿失败"
+    };
+  }
+}
+
+function IntegrationCheckResults({
+  checking,
+  results
+}: {
+  checking: boolean;
+  results: IntegrationCheckResult[];
+}) {
+  if (checking) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-line bg-slate-50 px-3 py-2 text-sm text-muted" role="status">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        正在验证 GitHub 提交读取和 OpenAI 草稿生成...
+      </div>
+    );
+  }
+
+  if (results.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2" aria-label="集成验证结果">
+      {results.map((result) => (
+        <div key={result.id} className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${checkResultClassName(result.status)}`}>
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{formatCheckResult(result)}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function checkResultClassName(status: IntegrationCheckStatus): string {
+  if (status === "success") {
+    return "border-green-200 bg-green-50 text-green-700";
+  }
+  if (status === "error") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function formatCheckResult(result: IntegrationCheckResult): string {
+  if (result.status === "success") {
+    return `${result.title}可用：${result.message}`;
+  }
+  if (result.status === "error") {
+    return `${result.title}不可用：${result.message}`;
+  }
+  return `${result.title}未验证：${result.message}`;
 }
 
 function TextField({

@@ -79,7 +79,7 @@ const archivedProject = {
   workItems: []
 };
 
-function mockFetch() {
+function mockFetch(options: { failIntegrationChecks?: boolean } = {}) {
   let archived = true;
   let projectDefaultBranch = project.defaultBranch;
   const projectSummary = () => ({ ...project, defaultBranch: projectDefaultBranch, workItems: undefined });
@@ -141,7 +141,10 @@ function mockFetch() {
     if (url === "/api/settings/openai/models") {
       return jsonResponse({ models: ["gpt-5.5", "gpt-5.5-mini"] });
     }
-    if (url === "/api/projects/project-1/github/commits?limit=5&branch=main") {
+    if (url === "/api/projects/project-1/github/commits?limit=1&branch=main" && options.failIntegrationChecks) {
+      return jsonResponse({ message: "GitHub API 调用已达到限额，请稍后重试或配置 token" }, 429);
+    }
+    if (url === "/api/projects/project-1/github/commits?limit=5&branch=main" || url === "/api/projects/project-1/github/commits?limit=1&branch=main") {
       return jsonResponse([
         {
           sha: "abcdef1234567890",
@@ -155,6 +158,9 @@ function mockFetch() {
           verification: { verified: true, reason: "valid" }
         }
       ]);
+    }
+    if (url === "/api/projects/project-1/work-items/draft" && method === "POST" && options.failIntegrationChecks) {
+      return jsonResponse({ message: "OpenAI Responses 未配置，请先设置 API key 和模型" }, 503);
     }
     if (url === "/api/projects/project-1/work-items/draft" && method === "POST") {
       return jsonResponse({
@@ -387,6 +393,38 @@ describe("App", () => {
         })
       );
     });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/projects/project-1/github/commits?limit=1&branch=main", expect.anything());
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/project-1/work-items/draft",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("运行时配置")
+      })
+    );
+    expect(await screen.findByText("GitHub 提交读取可用：读取到 1 条提交。")).toBeInTheDocument();
+    expect(screen.getByText("OpenAI 草稿生成可用：已生成草稿“修复上传断网重试”。")).toBeInTheDocument();
+  });
+
+  it("shows readable failures when saved integration checks fail", async () => {
+    const user = userEvent.setup();
+    mockFetch({ failIntegrationChecks: true });
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "DevFlow" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "设置" }));
+    expect(await screen.findByRole("heading", { name: "设置" })).toBeInTheDocument();
+    const integrationTab = screen.getAllByRole("button", { name: "集成" })[0];
+    if (!integrationTab) {
+      throw new Error("未找到集成设置入口");
+    }
+    await user.click(integrationTab);
+
+    await user.click(screen.getByRole("button", { name: "保存配置" }));
+
+    expect(await screen.findByText("GitHub 提交读取不可用：GitHub API 调用已达到限额，请稍后重试或配置 token")).toBeInTheDocument();
+    expect(screen.getByText("OpenAI 草稿生成不可用：OpenAI Responses 未配置，请先设置 API key 和模型")).toBeInTheDocument();
   });
 
   it("fills the new item form from a generated draft before saving", async () => {
