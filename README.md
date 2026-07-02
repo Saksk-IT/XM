@@ -21,7 +21,14 @@ pnpm db:seed
 pnpm dev
 ```
 
-Open `http://localhost:5173` and log in with the values from `.env`.
+Open the Vite URL printed by `pnpm dev` and log in with the values from `.env`.
+If local startup fails or Vite falls back from `5173` to another port, run:
+
+```bash
+pnpm dev:doctor
+```
+
+The doctor reports the actual XM Web port, `/api/health` status, Postgres TCP connectivity, and the most likely `pnpm dev` failure reason.
 
 Open the WeChat Mini Program project from `apps/miniprogram`. See `docs/miniprogram.md` for local/preview API profiles and AppSecret configuration.
 

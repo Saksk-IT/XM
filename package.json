@@ -6,10 +6,12 @@
   "packageManager": "pnpm@11.7.0",
   "scripts": {
     "dev": "pnpm --filter @xm/shared build && dotenv -e .env.example -e .env -o -- pnpm --parallel --filter @xm/api --filter @xm/web dev",
+    "dev:doctor": "dotenv -e .env.example -e .env -o -- node scripts/dev-doctor.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm --filter @xm/shared build && pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "pnpm --filter @xm/shared build && pnpm db:push && pnpm -r test",
+    "test": "pnpm test:dev-doctor && pnpm --filter @xm/shared build && pnpm db:push && pnpm -r test",
+    "test:dev-doctor": "node --test scripts/dev-doctor.test.mjs",
     "e2e": "pnpm --filter @xm/shared build && pnpm db:push && pnpm db:seed && dotenv -e .env.example -e .env -o -- pnpm --filter @xm/web e2e",
     "db:generate": "dotenv -e .env.example -e .env -o -- pnpm --filter @xm/api db:generate",
     "db:push": "dotenv -e .env.example -e .env -o -- pnpm --filter @xm/api db:push",
